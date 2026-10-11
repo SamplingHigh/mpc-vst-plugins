@@ -1342,3 +1342,16 @@ GROUP and SETUP screenshots in `ports/maschine/docs/` (`tools/screenshot.sh --pl
 
 ### 2026-10-10: installer app Apply / Undo on the Force (device, user-reported; PR #260)
 The Force (MPC 3.9.1.2, drum-pad layout patch already applied, stock backup present, `status` read over SSH before the test) was driven through the 0.0.0-applytest build of the desktop app, step 7. The user reported that it "works well". What was and was not checked by us: before the test, `status` printed `STATE state=patched supported=1 backup=1 checksum=7cf96599ec61b1079688f253f3b65b9f` over SSH (read only); the click-through itself (Undo then Apply, typed `UNDO` / `APPLY`) was done by the user, and the checksums after each step were not read back by us. Only the drum-pad patch was tried; the drive exec and button remap patches have no Apply/Undo run yet, and the app offers default settings only (no per-patch options).
+
+## 2026-10-11: HelmX draws to the screen from inside the plugin (read from its source; offline, not device-checked by us)
+Lewinator56's HelmX (`Lewinator56/mpc-vst-helm-x`, commit `1d7da15`, GPL-3.0, a modified copy of our `wrapper/vst2_wrap.c`) draws its own graphics (a 5-band EQ curve) on a plugin page. This is an escape hatch for **display only**: the skin still owns touch and parameters. What the source does (we did not build or run it):
+- **Drawing.** The plugin lives inside MPC's process. A worker thread scans `/proc/self/maps` for `/dev/dri` or `/dev/fb` mappings of at least 1 MB and writes XRGB pixels straight into them, assuming 1280x800 with a 5120-byte stride. No ioctl and no `open` of the card, so the DRM-master trap above does not apply. Our screenshots read a portrait 800x1280 scanout through `/dev/dri/cardN`, so this is probably MPC's own landscape render surface, a different buffer (unverified).
+- **Tab detection.** `shadow_skin.py` stamps the tab name as ASCII into pixels (0..3, 0) of each tab background (4 pixels x 3 bytes = 12 characters). The reader decodes screen (0, 110) (it searches y 108..112) and only draws when the tag matches, so other pages cost nothing. Needs the background drawn 1:1 with alpha 255; scaling, overlays and menus are untested.
+- **Timing.** No vsync or flip sync. `fb_timing.txt` (hot-reloaded) has interval, offset, burst repeat and a continuous mode, which look like workarounds for racing MPC's own repaint. Tearing or flicker are not ruled out.
+
+Problems found by reading it (reported upstream as a draft, not fixed here):
+- `mpc_fb_draw_curve` loops without end on any flat segment (`step` is -1 when `cy == prev`, so `sy != cy` never holds). Reproduced the loop logic in isolation only. HelmX's own EQ uses a private copy with a `prev != cy` guard.
+- `effClose` calls `mpc_fb_cleanup()`, which joins the one shared thread; closing one instance stops drawing for the others (no reference count).
+- `s_fbs`, `s_num_fbs` and the config are shared between threads without locks; it writes to every large `/dev/dri` mapping, not only the confirmed display; the tag reader accepts any two leading A-Z bytes; `debug=1` ships on and appends to `/tmp/mpc_fb.log`.
+
+Open: confirm on a device (buffer geometry, tearing, tag survival, behaviour with two plugins) before this is offered as a supported technique. Not catalog-conformant yet (no `mpc-plugin.json`).
