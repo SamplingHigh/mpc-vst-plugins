@@ -1354,4 +1354,6 @@ Problems found by reading it (reported upstream as a draft, not fixed here):
 - `effClose` calls `mpc_fb_cleanup()`, which joins the one shared thread; closing one instance stops drawing for the others (no reference count).
 - `s_fbs`, `s_num_fbs` and the config are shared between threads without locks; it writes to every large `/dev/dri` mapping, not only the confirmed display; the tag reader accepts any two leading A-Z bytes; `debug=1` ships on and appends to `/tmp/mpc_fb.log`.
 
+Author's report (Lewinator56, Discord, 2026-10-11; their device, not ours): no flicker. The drawing does not always disappear when the user switches to another tab (stale pixels stay until MPC repaints that area), which they are fixing, along with branch-free pixel drawing. They say it is not ready to ship, so treat the technique and the library as work in progress.
+
 Open: confirm on a device (buffer geometry, tearing, tag survival, behaviour with two plugins) before this is offered as a supported technique. Not catalog-conformant yet (no `mpc-plugin.json`).
