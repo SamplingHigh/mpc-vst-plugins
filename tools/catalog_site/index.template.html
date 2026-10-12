@@ -195,12 +195,12 @@ function osTag(v) {
   if (g.indexOf("2.x") >= 0) return '<span class="tag ok" title="' + esc("Skin and library checked against MPC OS 2.15.1's own skins and glibc. " + (tested2x(v) ? "Tested on a 2.x unit." : "Not yet tested on a 2.x unit.")) + '">MPC OS 2.x + 3.x' + (tested2x(v) ? " &middot; tested" : "") + '</span>';
   return '<span class="tag warn" title="' + esc("Not compatible with MPC OS 2.x" + (osWhy(v) ? ": " + osWhy(v) : "") + ((v.os_compat_why || []).length ? " (" + v.os_compat_why.join("; ") + ")" : "")) + '">MPC OS 3.x only</span>';
 }
-/* Gen2 (aarch64, MPC OS 3.x): the version also has an -mpc-aarch64.zip that passed the same checks (docs/GEN2.md). "Tested" needs a tested.json
-   entry whose device says Gen2; a passing build alone is not a device run. */
+/* Gen2 (aarch64, MPC OS 3.x): the version also has an -mpc-aarch64.zip that passed the same checks (docs/GEN2.md). The tag always says "Gen2 build";
+   a device run is the Verified Gen2 badge. "Tested" (the hover text and the Gen2 row) needs a tested.json entry whose device says Gen2. */
 function tested2(v) { return !!(v && (v.tested || []).some(function (t) { return /gen\s*2/i.test(t.device || ""); })); }
 function genTag(v) {
   if (!v || !v.gen2) return "";
-  return '<span class="tag gen" title="' + esc("Also built for Gen2 (aarch64) MPC devices. " + (tested2(v) ? "Tested on a Gen2 unit." : "Not yet tested on a Gen2 unit.")) + '">Gen2' + (tested2(v) ? " &middot; tested" : " build") + '</span>';
+  return '<span class="tag gen" title="' + esc("Also built for Gen2 (aarch64) MPC devices. " + (tested2(v) ? "Tested on a Gen2 unit." : "Not yet tested on a Gen2 unit.")) + '">Gen2 build</span>';
 }
 function genRow(v) {
   return v && v.gen2 ? '<dt>Gen2</dt><dd>aarch64 build available (' + (tested2(v) ? "tested on a Gen2 unit" : "not yet tested on a Gen2 unit") + ')</dd>' : "";
