@@ -59,25 +59,28 @@ with sync_playwright() as p:
     pg.reload()
     check("preselected from the link, junk ignored", pg.locator("[data-pick]:checked").count() == 1 and pg.locator("#inst-count").text_content() == "1 plugin selected")
     check("no script ran", not errors, str(errors))
-    # MPC OS badge and filter (docs/OS2_SKINS.md): they must agree, whatever the catalog holds (a catalog built before the field has none)
+    # MPC OS row and filter (docs/OS2_SKINS.md): they must agree, whatever the catalog holds (a catalog built before the field has none).
+    # 3.x is the standard, so the only badge is "MPC OS 2.x tested", on a 2.x-capable version with a 2.x device test.
     pg.goto(URL)
     check("MPC OS filter exists", pg.locator("#f-os").count() == 1)
-    for val, badge in (("2x", ".tag.ok"), ("3x", ".tag.warn:has-text('MPC OS 3.x only')")):
+    pg.select_option("#f-tier", "all")   # the fixture's 3.x-only plugin is experimental, hidden by default
+    for val, row in (("2x", "2.x and 3.x"), ("3x", "3.x only")):
         pg.select_option("#f-os", val)
-        cards = pg.locator("article.card")
-        wrong = [i for i in range(cards.count()) if cards.nth(i).locator(badge).count() != 1]
-        check("filter %s shows only cards with the matching badge" % val, not wrong, str(wrong))
+        cards = pg.locator("#grid article.card")
+        wrong = [i for i in range(cards.count()) if row not in (cards.nth(i).locator("dl.meta").text_content() or "")]
+        check("filter %s shows only cards whose MPC OS row matches" % val, cards.count() >= 1 and not wrong, "%d cards, wrong %s" % (cards.count(), wrong))
     pg.select_option("#f-os", index=0)
-    ok_tags = pg.locator(".tag.ok")
-    if ok_tags.count():
-        check("a 2.x badge says what it is", "2.x" in ok_tags.first.text_content() and ok_tags.first.get_attribute("title"))
+    pg.select_option("#f-tier", index=0)
+    os_tags = pg.locator("#grid .tag").filter(has_text="MPC OS")
+    check("no 3.x badge; the only MPC OS badge is '2.x tested'", os_tags.count() >= 1 and set(os_tags.all_text_contents()) == {"MPC OS 2.x tested"},
+          str(os_tags.all_text_contents()))
     # Gen2 (docs/GEN2.md): the badge, the filter and the two download buttons come from the version's gen2 flag and assets{}
     pg.goto(URL)
     check("device filter exists", pg.locator("#f-gen").count() == 1)
-    gen2_cards = pg.locator("article.card:has(.tag.gen)").count()
+    gen2_cards = pg.locator("#grid article.card:has(.tag.gen)").count()
     for val, want in (("gen2", True), ("gen1", False)):
         pg.select_option("#f-gen", val)
-        cards = pg.locator("article.card")
+        cards = pg.locator("#grid article.card")
         wrong = [i for i in range(cards.count()) if (cards.nth(i).locator(".tag.gen").count() == 1) != want]
         check("device filter %s shows only the matching cards" % val, not wrong, str(wrong))
         if val == "gen2":
