@@ -23,6 +23,12 @@ Design: `docs/CATALOG.md`. Formats: `docs/CATALOG_SPEC.md`.
 Open-source licenses (list in `tools/catalog_build.py`) or public source with `source_available` set. No versions or
 checksums go in the entry.
 
+**Skins and branding.** A listed plugin's skin, screenshot, name, summary and tags must not use another company's name or
+logo: no manufacturer logos or wordmarks, no logo-bearing front-panel artwork, no trademarked product art. Name the
+instrument you model in plain words if you must (for example "an 808-style drum machine"), and put the credit in your
+repo's README instead. A listing found to break this is removed by a PR that deletes `catalog/plugins/<id>.json`; once the
+skin and screenshot are clean, re-add the entry with a new PR (the same one-file change as the first listing).
+
 ## Addins
 An addin (a library MPC loads when it starts, through `LD_PRELOAD`) is listed the same way, with `"kind": "addin"` in its
 entry. Package it with `tools/release_addin.py` instead of `release.py`: see `docs/ADDINS.md`.
