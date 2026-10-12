@@ -140,9 +140,9 @@ var TIERS = { verified: { rank: 0, label: "Verified", tip: "The newest release h
               listed: { rank: 1, label: "Listed", tip: "Passed the catalog's release checks; no hardware test recorded for the newest release yet." },
               experimental: { rank: 2, label: "Experimental", tip: "New, beta-only or unproven: it may not load, draw its skin or run well. Test it before relying on it." } };
 function tierOf(p) { return TIERS[p.tier] ? p.tier : "listed"; }
-/* Verified is per device generation (catalog_build.py verified_on): gen1 = a tested.json entry on a Gen1 MPC or Force, gen2 = one whose device
+/* Verified is per device generation (catalog_build.py verified_on): gen1 = a tested.json entry on a Gen1 device, gen2 = one whose device
    names Gen2, on a version with an aarch64 build. Each gets its own badge. Catalogs built before the field: a verified plugin counts as Gen1. */
-var GENS = { gen1: { label: "Verified Gen1", tip: "The newest release has a recorded hardware test on a Gen1 MPC or a Force (see Tested on)." },
+var GENS = { gen1: { label: "Verified Gen1", tip: "The newest release has a recorded hardware test on a Gen1 device (see Tested on)." },
              gen2: { label: "Verified Gen2", tip: "The newest release's Gen2 (aarch64) build has a recorded hardware test on a Gen2 MPC (see Tested on)." } };
 function verifiedOn(p) { return tierOf(p) !== "verified" ? [] : Array.isArray(p.verified_on) ? p.verified_on.filter(function (g) { return GENS[g]; }) : ["gen1"]; }
 var TIER_FILTERS = ["verified", "verified-gen1", "verified-gen2", "listed", "experimental", "all"];
@@ -166,9 +166,9 @@ var KINDS = { instrument: "Instruments", midi: "MIDI", effect: "Effects", addin:
 function inTabKind(p, k) { if (k === "all") return true; return kindsOf(p).some(function (c) { return (c === "instrument" && p.role === "midi" && c === p.kind ? "midi" : c) === k; }); }
 var title = function (s) { return s.replace(/-/g, " ").replace(/^./, function (c) { return c.toUpperCase(); }); };
 fillSelect("f-dist", "Any distribution", ["release", "build-yourself"], function (v) { return v === "release" ? "Download a release zip" : "Build it yourself"; });
-fillSelect("f-tier", "Verified and unverified", TIER_FILTERS, function (v) { return v === "all" ? "All tiers" : v === "verified" ? "Verified only" : v === "verified-gen1" ? "Verified on Gen1 / Force" : v === "verified-gen2" ? "Verified on Gen2" : v === "listed" ? "Not yet verified" : "Experimental only"; });
+fillSelect("f-tier", "Verified and unverified", TIER_FILTERS, function (v) { return v === "all" ? "All tiers" : v === "verified" ? "Verified only" : v === "verified-gen1" ? "Verified on Gen1" : v === "verified-gen2" ? "Verified on Gen2" : v === "listed" ? "Not yet verified" : "Experimental only"; });
 fillSelect("f-os", "Any MPC OS", ["2x", "3x"], function (v) { return v === "2x" ? "Works on MPC OS 2.x" : "MPC OS 3.x only"; });
-fillSelect("f-gen", "Any device", ["gen2", "gen1"], function (v) { return v === "gen2" ? "Has a Gen2 (aarch64) build" : "Gen1 / Force only"; });
+fillSelect("f-gen", "Any device", ["gen2", "gen1"], function (v) { return v === "gen2" ? "Has a Gen2 (aarch64) build" : "Gen1 only"; });
 fillSelect("f-style", "All styles", uniq(function (p) { return p.style; }), title);
 fillSelect("f-dev", "All developers", uniq(function (p) { return p.author; }));
 fillSelect("f-lic", "Any license", ["open", "source-available"], function (v) { return v === "open" ? "Open source" : "Source-available (restricted use)"; });
@@ -279,7 +279,7 @@ function card(p) {
   return head +
     '<dl class="meta"><dt>Updated</dt><dd>' + esc(p.updated || "n/a") + '</dd><dt>Downloads</dt><dd>' + p.downloads.toLocaleString() + '</dd>' + testedRow(v) + (p.kind !== "addin" ? osRow(v) + genRow(v) : "") +
     (v && p.kind !== "addin" ? '<dt>Projects</dt><dd>Compat ' + v.param_compat + ' (saved projects break only when this changes)</dd>' : '') + '<dt>Source</dt><dd>' + esc(p.repo) + '</dd></dl>' +
-    '<div class="actions">' + (v ? '<a class="btn-l primary" href="' + esc(v.url) + '"' + (v.gen2 ? ' title="MPC Live/One/X/Key and Force (32-bit ARM)"' : '') + '>Download' + (v.gen2 ? ' (Gen1 / Force)' : '') + '</a>' : '') +
+    '<div class="actions">' + (v ? '<a class="btn-l primary" href="' + esc(v.url) + '"' + (v.gen2 ? ' title="MPC Live/One/X/Key and Force (32-bit ARM)"' : '') + '>Download' + (v.gen2 ? ' (Gen1)' : '') + '</a>' : '') +
     (v && v.gen2 && v.assets && v.assets.aarch64 ? '<a class="btn-l primary" href="' + esc(v.assets.aarch64.url) + '" title="Gen2 MPC devices (aarch64, MPC OS 3.x)">Download (Gen2)</a>' : '') +
     '<a class="btn-l" href="https://github.com/' + esc(p.repo) + '">Source</a>' +
     (v && ID_RE.test(p.id) ? '<label class="pick"><input type="checkbox" data-pick="' + esc(p.id) + '"' + (state.sel.indexOf(p.id) >= 0 ? " checked" : "") + '> Add to install list</label>' : '') +

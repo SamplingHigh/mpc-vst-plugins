@@ -98,7 +98,7 @@ GEN2_DEVICE = re.compile(r"gen\s*2", re.I)   # a tested.json device naming Gen2,
 
 
 def verified_on(versions):
-    """Device generations the newest stable, unyanked version has a tested.json entry for: "gen1" (Gen1 MPCs and Force, the armv7
+    """Device generations the newest stable, unyanked version has a tested.json entry for: "gen1" (a Gen1 device, the armv7
     build) and/or "gen2" (a device naming Gen2; counts only when that version has an aarch64 build)."""
     live = [v for v in versions if v["channel"] == "stable" and not v["yanked"]]
     if not live:
@@ -125,7 +125,7 @@ BAR = {   # id -> what the author sees. Informational: it never hides or demotes
     "skin": "ship a native MPC skin",
     "cpu-fail": "bring the CPU use down (the bench verdict is FAIL)",
     "cpu-bench": "run the CPU bench (docs/BENCH.md) so the release records a figure",
-    "tested": "add a tested.json entry for the newest release on a Gen1 MPC or Force (device and MPC OS version)",
+    "tested": "add a tested.json entry for the newest release on a Gen1 device (device and MPC OS version)",
     "tested-gen2": "add a tested.json entry for the newest release's Gen2 build (a device naming Gen2, e.g. \"MPC Live III (Gen2)\")",
 }
 
