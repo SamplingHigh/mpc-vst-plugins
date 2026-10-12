@@ -134,12 +134,18 @@ var ID_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 function isBY(p) { return p.distribution === "build-yourself"; }
 function kindsOf(p) { var k = [p.kind]; (p.components || []).forEach(function (c) { if (k.indexOf(c.kind) < 0) k.push(c.kind); }); return k; }
 /* Trust tiers (tools/catalog_build.py tier_of, docs/CATALOG.md). Listed is the unlabelled middle: a card with no tier badge is in the catalog
-   and passed the release checks, nothing more. Only Verified and Experimental get a badge. verified = tested on a device, listed = passed the release checks,
+   and passed the release checks, nothing more. Only Verified (one badge per generation, below) and Experimental get a badge. verified = tested on a device, listed = passed the release checks,
    experimental = new, beta-only or capped by a maintainer. The default view hides experimental; the Tier filter shows it. */
 var TIERS = { verified: { rank: 0, label: "Verified", tip: "The newest release has a recorded hardware test (see Tested on)." },
               listed: { rank: 1, label: "Listed", tip: "Passed the catalog's release checks; no hardware test recorded for the newest release yet." },
               experimental: { rank: 2, label: "Experimental", tip: "New, beta-only or unproven: it may not load, draw its skin or run well. Test it before relying on it." } };
 function tierOf(p) { return TIERS[p.tier] ? p.tier : "listed"; }
+/* Verified is per device generation (catalog_build.py verified_on): gen1 = a tested.json entry on a Gen1 MPC or Force, gen2 = one whose device
+   names Gen2, on a version with an aarch64 build. Each gets its own badge. Catalogs built before the field: a verified plugin counts as Gen1. */
+var GENS = { gen1: { label: "Verified Gen1", tip: "The newest release has a recorded hardware test on a Gen1 MPC or a Force (see Tested on)." },
+             gen2: { label: "Verified Gen2", tip: "The newest release's Gen2 (aarch64) build has a recorded hardware test on a Gen2 MPC (see Tested on)." } };
+function verifiedOn(p) { return tierOf(p) !== "verified" ? [] : Array.isArray(p.verified_on) ? p.verified_on.filter(function (g) { return GENS[g]; }) : ["gen1"]; }
+var TIER_FILTERS = ["verified", "verified-gen1", "verified-gen2", "listed", "experimental", "all"];
 var SORTS = {
   recommended: { label: "Recommended",     cmp: function (a, b) { return (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || TIERS[tierOf(a)].rank - TIERS[tierOf(b)].rank || a.name.localeCompare(b.name); }, desc: false },
   name:      { label: "Name",              cmp: function (a, b) { return a.name.localeCompare(b.name); }, desc: false },
@@ -160,7 +166,7 @@ var KINDS = { instrument: "Instruments", midi: "MIDI", effect: "Effects", addin:
 function inTabKind(p, k) { if (k === "all") return true; return kindsOf(p).some(function (c) { return (c === "instrument" && p.role === "midi" && c === p.kind ? "midi" : c) === k; }); }
 var title = function (s) { return s.replace(/-/g, " ").replace(/^./, function (c) { return c.toUpperCase(); }); };
 fillSelect("f-dist", "Any distribution", ["release", "build-yourself"], function (v) { return v === "release" ? "Download a release zip" : "Build it yourself"; });
-fillSelect("f-tier", "Verified and unverified", ["verified", "listed", "experimental", "all"], function (v) { return v === "all" ? "All tiers" : v === "verified" ? "Verified only" : v === "listed" ? "Not yet verified" : "Experimental only"; });
+fillSelect("f-tier", "Verified and unverified", TIER_FILTERS, function (v) { return v === "all" ? "All tiers" : v === "verified" ? "Verified only" : v === "verified-gen1" ? "Verified on Gen1 / Force" : v === "verified-gen2" ? "Verified on Gen2" : v === "listed" ? "Not yet verified" : "Experimental only"; });
 fillSelect("f-os", "Any MPC OS", ["2x", "3x"], function (v) { return v === "2x" ? "Works on MPC OS 2.x" : "MPC OS 3.x only"; });
 fillSelect("f-gen", "Any device", ["gen2", "gen1"], function (v) { return v === "gen2" ? "Has a Gen2 (aarch64) build" : "Gen1 / Force only"; });
 fillSelect("f-style", "All styles", uniq(function (p) { return p.style; }), title);
@@ -208,7 +214,8 @@ function match(p) {
   var s = state, hay = [p.name, p.author, p.style || "", (p.tags || []).join(" "), p.summary].join(" ").toLowerCase();
   if (s.q && hay.indexOf(s.q.toLowerCase()) < 0) return false;
   if (PLUGIN_TABS.indexOf(s.tab) >= 0 && !inTabKind(p, s.tab)) return false;
-  if (s.tier === "all") {} else if (s.tier) { if (tierOf(p) !== s.tier) return false; } else if (tierOf(p) === "experimental") return false;
+  if (s.tier === "all") {} else if (/^verified-/.test(s.tier)) { if (verifiedOn(p).indexOf(s.tier.slice(9)) < 0) return false; }
+  else if (s.tier) { if (tierOf(p) !== s.tier) return false; } else if (tierOf(p) === "experimental") return false;
   if (s.dist === "build-yourself" && !isBY(p)) return false;
   if (s.dist === "release" && isBY(p)) return false;
   if (s.style && p.style !== s.style) return false;
@@ -234,7 +241,8 @@ function barLine(p) {
 function card(p) {
   var by = isBY(p), v = shown(p), tags = [];
   if (by) tags.push('<span class="tag build" title="No download: you build it from your own files">Build it yourself</span>');
-  if (tierOf(p) !== "listed") tags.push('<span class="tag tier-' + tierOf(p) + '" title="' + esc(TIERS[tierOf(p)].tip) + '">' + TIERS[tierOf(p)].label + '</span>');
+  if (tierOf(p) === "verified") verifiedOn(p).forEach(function (g) { tags.push('<span class="tag tier-verified" data-gen="' + g + '" title="' + esc(GENS[g].tip) + '">' + GENS[g].label + '</span>'); });
+  else if (tierOf(p) !== "listed") tags.push('<span class="tag tier-' + tierOf(p) + '" title="' + esc(TIERS[tierOf(p)].tip) + '">' + TIERS[tierOf(p)].label + '</span>');
   tags.push(p.kind === "addin" ? '<span class="tag" title="Loaded into MPC when it starts (LD_PRELOAD), not a plugin on a track">addin</span>' : '<span class="tag">' + esc(p.kind) + '</span>');
   if (p.style) tags.push('<span class="tag">' + esc(title(p.style)) + '</span>');
   tags.push('<span class="tag">' + esc(p.license) + '</span>');
@@ -306,7 +314,7 @@ function load() {
     else if (k in state) state[k] = v;
   });
   if (!SORTS[state.sort]) state.sort = "recommended";
-  if (state.tier && state.tier !== "all" && !TIERS[state.tier]) state.tier = "";
+  if (state.tier && TIER_FILTERS.indexOf(state.tier) < 0) state.tier = "";
   if (state.tab === "plugins") state.tab = "instrument";   // links from before the split
   if (TABS.indexOf(state.tab) < 0) state.tab = "instrument";
 }

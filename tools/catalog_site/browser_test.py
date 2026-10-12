@@ -96,6 +96,14 @@ with sync_playwright() as p:
     check("Listed has no badge; Verified and Experimental do", pg.locator("#grid article[data-tier=listed] .tag[class*=tier-]").count() == 0
           and pg.locator("#grid article[data-tier=verified] .tag.tier-verified").count() >= 1)
     check("Recommended sorts by tier", [rank[t] for t in tiers] == sorted(rank[t] for t in tiers), str(tiers))
+    # Verified is split by device generation: one badge per generation, and a Tier filter option for each
+    both = pg.locator("#grid article:has(h2:text-is('Tested Two')) .tag.tier-verified").all_text_contents()
+    check("a plugin tested on both generations has two Verified badges", both == ["Verified Gen1", "Verified Gen2"], str(both))
+    for val, gen in (("verified-gen1", "gen1"), ("verified-gen2", "gen2")):
+        pg.select_option("#f-tier", val)
+        cards = pg.locator("#grid article.card")
+        wrong = [i for i in range(cards.count()) if cards.nth(i).locator(".tag.tier-verified[data-gen=%s]" % gen).count() != 1]
+        check("Tier filter %s shows only cards with that badge" % val, cards.count() >= 1 and not wrong, "%d cards, wrong %s" % (cards.count(), wrong))
     pg.select_option("#f-tier", index=0)
     check("experimental plugins are hidden by default", pg.locator(".tag.tier-experimental").count() == 0)
     check("the hidden-experimental note offers them", pg.locator("#exp").is_visible())

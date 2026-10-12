@@ -56,6 +56,8 @@ boot methods unrelated to this repo, so Gen2 plugin support remains usable only 
 `index.html`: a **Gen2** tag on a version with an aarch64 asset ("Gen2 build", or "Gen2 · tested" when a `tested.json` entry's `device`
 contains "Gen2"), a **Device** filter (has a Gen2 build / Gen1 and Force only), and two download buttons, "Download (Gen1 / Force)" and
 "Download (Gen2)". A passing aarch64 build is not "tested": that needs the device string. Use e.g. `"device": "MPC Live III (Gen2)"` in `tested.json`.
+The same rule splits the Verified badge (2026-10-12, offline): the newest stable release gets "Verified Gen2" from such an entry (only when it
+has an aarch64 build) and "Verified Gen1" from any other entry, each its own badge and Tier filter option (`verified_on` in `catalog.json`).
 Checked in Chromium (Playwright) against a fixture catalog with two Gen2 versions.
 
 ## Developers
