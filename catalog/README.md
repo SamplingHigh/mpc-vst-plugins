@@ -23,10 +23,10 @@ Design: `docs/CATALOG.md`. Formats: `docs/CATALOG_SPEC.md`.
 Open-source licenses (list in `tools/catalog_build.py`) or public source with `source_available` set. No versions or
 checksums go in the entry.
 
-**Skins and branding.** A listed plugin's skin, screenshot, name, summary and tags must not use another company's name or
-logo: no manufacturer logos or wordmarks, no logo-bearing front-panel artwork, no trademarked product art. Name the
-instrument you model in plain words if you must (for example "an 808-style drum machine"), and put the credit in your
-repo's README instead. A listing found to break this is removed by a PR that deletes `catalog/plugins/<id>.json`; once the
+**Skins and branding.** A listed plugin's skin, screenshot and name must not use another company's name or logo: no
+manufacturer logos or wordmarks, no logo-bearing front-panel artwork, no trademarked product art, no manufacturer's name as
+the plugin's title. The summary and tags may name what you model in a descriptive way ("Minimoog-style", "inspired by the
+LXR-02"), as long as they don't suggest the original maker made or endorses it. Put the full credit in your repo's README. A listing found to break this is removed by a PR that deletes `catalog/plugins/<id>.json`; once the
 skin and screenshot are clean, re-add the entry with a new PR (the same one-file change as the first listing).
 
 ## Addins
