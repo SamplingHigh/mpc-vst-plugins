@@ -22,9 +22,50 @@ list of what would break. Mark items as they are done, with the date and whether
 | `tools/catalog_site/index.template.html` | `SITE` fallback | Minor (only when not served over http). |
 | `catalog/patches.json`, `docs/PATCHES.md` | `raw.githubusercontent.com/sd88me/mpc-vst-plugins/<commit>/...` | Raw URLs after a transfer: verify, do not assume. |
 | `.github/workflows/{vst,addin}-release.yml` and the docs that show them | `uses: sd88me/mpc-vst-plugins/.github/workflows/...@<sha>` | **Other developers' release workflows** pin this path. |
+| `.github/workflows/vst-release.yml:106`, `addin-release.yml:88` | `repository: sd88me/mpc-vst-plugins` in the "Check out mpc-vst-plugins (tools)" step | Every release run that uses the reusable workflow, until the owner is changed here. Whether the checkout follows a transfer redirect is unverified. |
+| `tools/catalog_build.py` | `api.github.com/repos/<owner>/<name>/...` through `urllib` (follows redirects on GET) | Probably nothing, but untested. Update the registry entry anyway. |
 | `catalog/plugins/*.json` | `repo` for ~23 `sd88me` entries | Catalog discovery if a repo moves and the entry is not updated. |
 | `README.md`, `catalog/pages/*.md`, `docs/*` | links | Cosmetic once redirects work. |
 | `docs/NOTES.md` | historical mentions | Leave alone; they are history. |
+
+## What will and will not be resolved (2026-10-14, offline analysis; redirect behaviour unverified)
+
+### Cannot be fully resolved
+| Problem | Why |
+|---|---|
+| Old installs of the desktop app and `mpc-store.sh` | They default to `sd88me.github.io/...`. Pages URLs reportedly do not redirect on transfer. A copy can be kept at the old URL, but only by keeping something under `sd88me` for as long as old installs exist. |
+| Old external links (forum, Discord, videos) to the Pages site | Repo links redirect; Pages links reportedly do not. |
+| Stars, download counts shown on the catalog | Whether they carry over is unverified. |
+| Reusing the old name | Creating anything at `sd88me/mpc-vst-plugins` later can break the redirect. A permanent constraint on the old account. |
+| Third parties who never update their workflow | They stay on whatever the redirect (if any) gives them. |
+
+### Can be fixed
+| Problem | Fix |
+|---|---|
+| Hard-coded owner in 74 files, including the two `repository:` checkouts above | One reviewed PR with tests (`test_patches.py`, desktop tests, `catalog_check.py --catalog`) and docs updated in the same PR. |
+| Clients with one catalog URL | Release the desktop app and `mpc-store.sh` with both URLs (new first, old as fallback) before the transfer. |
+| `repo` in the ~23 `sd88me` registry entries | Update each in the same step as that repo's transfer. |
+| Pinned raw URLs in `catalog/patches.json` | Rewrite once the redirect behaviour is known. |
+| Secrets, webhooks, Pages source, branch protection | Redo on the org (checklist item). |
+| Trust and governance | Policy page, 2+ owners. |
+| Name and trademark | Check before committing to the name. |
+
+### What contributors will need to do
+- **Authors who stay in their own repos:** possibly nothing, if a `uses:` reference follows the redirect. If not, change one
+  line in their release workflow (`sd88me/mpc-vst-plugins/...@<sha>` to the org path). Their registry entry is unaffected.
+- **Authors whose repo moves into the org:** consent to and accept the transfer (ownership and admin change), and update
+  their `catalog/plugins/<id>.json` `repo` field in a PR.
+- **Anyone with a fork or clone:** update the remote URL (the old one keeps working while the redirect stands).
+- **New contributors:** catalog PRs go to the org's repo; the docs and PR template say so.
+
+### Effect on the catalog
+- **Discovery:** plugins that do not move are unaffected. For moved repos the API redirect should carry the call, but
+  update the registry entry rather than rely on it.
+- **Site URL:** becomes `<org>.github.io/mpc-vst-plugins/` (or a custom domain). The old one needs a redirect page or a copy.
+- **`catalog.json`, `catalog.tsv`, `patches.json`:** must be live at the new URL before clients switch.
+- **Version history and `tested.json`:** live in the plugin repos and the catalog repo, so they move with them. Check the
+  nightly build after every transfer.
+- **Risk window:** between the transfer and clients learning the new URL. This is why the dual-URL client release goes first.
 
 ## Facts to verify before relying on them
 GitHub's docs were not reachable from the agent session (network policy), so these come from search snippets or memory.
@@ -35,6 +76,8 @@ Check each by hand, ideally on a throwaway repo and org first.
       The Boost thread says it can. Test before using that workaround.
 - [ ] **Does `uses: owner/repo/.github/workflows/x.yml@<sha>` follow a transfer redirect?** No source found. Test with a
       scratch caller workflow. If not, every external release workflow needs a one-line edit.
+- [ ] **Does `actions/checkout` with `repository: <old owner>/<name>` follow it?** Same test, same scratch repo.
+- [ ] **Does `urllib` in `catalog_build.py` follow the API's redirect for a transferred repo** (and keep its auth header)?
 - [ ] **`releases/download/...` and `raw.githubusercontent.com` URLs after a transfer.** Test with a real release asset and a
       pinned-commit raw URL.
 - [ ] Which settings travel with a transfer: Pages config, Actions secrets and variables, webhooks (the Discord release
