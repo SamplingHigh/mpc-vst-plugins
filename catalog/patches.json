@@ -36,6 +36,23 @@
       "reversible": true
     },
     {
+      "id": "auto-exec",
+      "title": "Auto exec: run plugins from any noexec drive, no setup",
+      "summary": "UNTESTED on a device by this project. MPC cannot load a plugin from a drive mounted noexec (SSD, USB stick, SD card): it is listed but only shows Load Plugin. This makes the Synths folder of every noexec drive executable through a small boot-time service, with nothing to choose; the drives stay noexec. Run its release command before ejecting a drive. Replaces drive exec once device-verified.",
+      "author": "sd88me (mount logic after timomacquis)",
+      "license": "MIT",
+      "docs": "tools/mpc_patch/auto_exec/README.md",
+      "script": {
+        "url": "https://raw.githubusercontent.com/sd88me/mpc-vst-plugins/1a6251e5dc90386a010179cb2173a51831cbbf4b/tools/mpc_patch/auto_exec/auto-exec-patch.sh",
+        "sha256": "23521d7069a19c2fc1bee62414f200f645ef8b7ddc1b916148c565ce73aee486"
+      },
+      "supports": {"os": "MPC OS Gen1 (mount probe on a Force, 2026-10-14)", "arch": "armv7l"},
+      "modifies": ["/etc/auto-exec", "/etc/systemd/system/auto-exec.timer", "/usr/lib/systemd/system/auto-exec-bootstrap.service", "/media/<each noexec drive>/Synths (an executable bind mount of the folder)"],
+      "backup": "/data/mpc-vst-plugins/backups",
+      "restarts_mpc": false,
+      "reversible": true
+    },
+    {
       "id": "button-remap",
       "title": "Button remap: open screens from hardware buttons",
       "summary": "Remap hardware buttons on a standalone MPC or Force (an LD_PRELOAD shim: a button can become other buttons, a pad or a screen tap). Pick which remaps you want at install (Force: Mixer, Edit, Clip, Menu and Knobs options; the Mode Menu must be at its default layout for the ones that tap an icon). The author's hwremap was tried on an MPC Live (Hakai, MPC 3.9.1) and a Force (stock 3.9.0); this installer and its Force rules were run on one Force (MPC OS 3.x) on 2026-10-10. Not tried yet: uninstall and the MPC Live map on a device. It does not work together with MidiLoop / MockbaMod's input path.",
