@@ -148,12 +148,28 @@ func RunInstall(dev *Device, root Root, items []Item, workDir string, j *Job, re
 	cleanup := func() { dev.Run("rm -rf "+shQuote(tmp), nil, nil) }
 	for i, p := range pkgs {
 		j.log("Copying %s to the device (%d MB unpacked)", p.Title, p.Unpacked>>20)
-		pr, pw := io.Pipe()
-		go func(p *Package) { pw.CloseWithError(p.WriteTar(pw)) }(p)
 		dir := fmt.Sprintf("%s/p%d", tmp, i+1)
 		var out []string
-		code, rerr := dev.Run("mkdir -p "+shQuote(dir)+" && tar -xf - -C "+shQuote(dir), pr, func(l string) { out = append(out, l) })
-		pr.Close()
+		copyOnce := func(cmd string) (int, error) { // each attempt streams the package through a pipe of its own
+			pr, pw := io.Pipe()
+			go func() { pw.CloseWithError(p.WriteTar(pw)) }()
+			out = nil
+			code, err := dev.Run(cmd, pr, func(l string) { out = append(out, l) })
+			pr.Close()
+			return code, err
+		}
+		code, rerr := copyOnce("mkdir -p " + shQuote(dir) + " && tar -xf - -C " + shQuote(dir))
+		if connectionLost(rerr) && dev.host != "" { // nothing is installed and MPC is untouched yet, so copying again is safe
+			j.log("The connection to the device dropped while copying %s (%v). Reconnecting and copying it again.", p.Title, rerr)
+			if cerr := dev.reconnect(); cerr != nil {
+				return fmt.Errorf("the connection to the device dropped while copying %s and could not be made again (%v). Nothing was installed and MPC was not stopped. Check the network (and any VPN), then try again", p.Title, cerr)
+			}
+			code, rerr = copyOnce("rm -rf " + shQuote(dir) + " && mkdir -p " + shQuote(dir) + " && tar -xf - -C " + shQuote(dir))
+		}
+		if connectionLost(rerr) {
+			cleanup()
+			return fmt.Errorf("the connection to the device dropped while copying %s (%v). Nothing was installed and MPC was not stopped. Check the network (and any VPN), then try again", p.Title, rerr)
+		}
 		if rerr != nil || code != 0 {
 			cleanup()
 			return fmt.Errorf("copying %s failed (status %d): %v %s", p.Title, code, rerr, strings.Join(out, " "))

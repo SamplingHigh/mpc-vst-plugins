@@ -122,9 +122,12 @@ type DevAddin struct {
 }
 
 type Device struct {
+	mu     sync.Mutex // guards client, which reconnect swaps
 	client *ssh.Client
 	cfg    Config
 	Info   DeviceInfo
+	// for reconnect: kept in memory for this connection only, never written anywhere
+	host, password, fp string
 }
 
 var hostRe = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
@@ -182,7 +185,7 @@ func Dial(host, password string, cfg Config) (*Device, error) {
 		}
 		return nil, fmt.Errorf("cannot log in to %s: %w", host, err)
 	}
-	d := &Device{client: c, cfg: cfg}
+	d := &Device{client: c, cfg: cfg, host: host, password: password, fp: fp}
 	if err := d.readInfo(host, fp); err != nil {
 		c.Close()
 		return nil, err
@@ -191,9 +194,55 @@ func Dial(host, password string, cfg Config) (*Device, error) {
 }
 
 func (d *Device) Close() {
-	if d.client != nil {
-		d.client.Close()
+	if c := d.conn(); c != nil {
+		c.Close()
 	}
+}
+
+// reconnect replaces a dropped SSH connection with a new one to the same device, after checking that it presents the same
+// host key (a laptop or phone that changed networks must not end up talking to something else at that address).
+func (d *Device) reconnect() error {
+	var fp string
+	conf := &ssh.ClientConfig{
+		User: d.cfg.User, Auth: authMethods(d.password), Timeout: 10 * time.Second,
+		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			fp = ssh.FingerprintSHA256(key)
+			if d.fp != "" && fp != d.fp {
+				return fmt.Errorf("the device at %s now has a different key (%s, was %s)", d.host, fp, d.fp)
+			}
+			return nil
+		},
+	}
+	c, err := ssh.Dial("tcp", net.JoinHostPort(d.host, d.cfg.Port), conf)
+	if err != nil {
+		return fmt.Errorf("cannot reconnect to %s: %w", d.host, err)
+	}
+	d.mu.Lock()
+	old := d.client
+	d.client = c
+	d.mu.Unlock()
+	if old != nil {
+		old.Close()
+	}
+	return nil
+}
+
+func (d *Device) conn() *ssh.Client { d.mu.Lock(); defer d.mu.Unlock(); return d.client }
+
+// connectionLost tells a dropped connection (Wi-Fi or VPN change, a laptop waking from sleep, the OS cutting a background
+// app's network) from a command that ran and failed.
+func connectionLost(err error) bool {
+	if err == nil {
+		return false
+	}
+	var ee *ssh.ExitError
+	if errors.As(err, &ee) {
+		return false
+	}
+	var em *ssh.ExitMissingError // the channel closed with no exit status: the transport died under the command
+	var ne net.Error
+	return errors.As(err, &em) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.As(err, &ne) ||
+		strings.Contains(err.Error(), "connection") || strings.Contains(err.Error(), "broken pipe")
 }
 
 type lineWriter struct {
@@ -230,7 +279,13 @@ func (w *lineWriter) flush() {
 
 // Run executes cmd on the device; stdout and stderr lines go to onLine. It returns the exit status.
 func (d *Device) Run(cmd string, stdin io.Reader, onLine func(string)) (int, error) {
-	s, err := d.client.NewSession()
+	s, err := d.conn().NewSession()
+	if err != nil && d.host != "" { // the connection is gone and nothing has run yet: reconnect once and go on
+		if rerr := d.reconnect(); rerr != nil {
+			return -1, fmt.Errorf("%v; %w", err, rerr)
+		}
+		s, err = d.conn().NewSession()
+	}
 	if err != nil {
 		return -1, err
 	}

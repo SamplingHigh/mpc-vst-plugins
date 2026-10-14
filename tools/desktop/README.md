@@ -26,6 +26,10 @@ one MPC stop and start around the whole batch when the installers allow it.
    (save your project: MPC restarts), it copies every package to a private folder in the device's `/tmp`, stops MPC once, runs each
    package's `install.sh -y -n`, starts MPC once and removes the copies. An installer that predates `-n` runs first with its own
    restart. MPC is started again even if something fails, and nothing after the failing plugin is installed.
+   If the SSH connection drops during a copy (a laptop waking from sleep, a Wi-Fi or VPN change), the app reconnects once, after
+   checking that the device presents the same key, and copies that package again; MPC is not stopped and nothing is installed
+   until every copy is done, so this is safe. A second drop stops with "Nothing was installed and MPC was not stopped"
+   (`TestACopyThatLosesTheConnectionIsRetriedOnce`, offline, 2026-10-14).
 
 4. **Remove** (step 4 on the page): lists the plugin folders on the device. A plugin the app can identify (from the catalog, or from a
    zip you dropped in this session) can be ticked and removed: MPC is stopped once, `MPC.settings` is backed up and the plugin's entry is

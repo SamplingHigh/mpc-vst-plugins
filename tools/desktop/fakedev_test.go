@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -26,6 +27,9 @@ type fakeDevice struct {
 	shims  string
 	logMu  sync.Mutex
 	mpcLog string // systemctl calls, one per line
+	// dropOnCopy > 0 cuts the SSH connection when a copy (tar -xf) starts, that many times, like a laptop waking from sleep or a
+	// phone losing the network mid-install
+	dropOnCopy atomic.Int32
 }
 
 func newFakeDevice(t *testing.T) *fakeDevice { t.Helper(); return newFake(t, false) }
@@ -137,6 +141,10 @@ func (fd *fakeDevice) serve(nc net.Conn, conf *ssh.ServerConfig) {
 				n := binary.BigEndian.Uint32(r.Payload)
 				cmd := string(r.Payload[4 : 4+n])
 				r.Reply(true, nil)
+				if strings.Contains(cmd, "tar -xf") && fd.dropOnCopy.Add(-1) >= 0 {
+					nc.Close()
+					return
+				}
 				c := exec.Command("sh", "-c", cmd)
 				// the addin installer edits systemd units under SYSTEMD_ROOT and logs its systemctl calls instead of making them
 				c.Env = append(os.Environ(), "PATH="+fd.shims+":"+os.Getenv("PATH"), "ADDIN_INSTALL_TEST=1",
