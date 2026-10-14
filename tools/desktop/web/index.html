@@ -330,7 +330,7 @@ function drawCat() {
 }
 function rootNote(r) {
   var n = [];
-  if (r.noExec) n.push("Mounted noexec: this drive does not let MPC run programs from it, so plugins installed here would be listed but only show Load Plugin. Two ways forward: install on the internal drive (pick it above), or keep this drive and apply the drive exec patch in step 7 (Advanced), which makes only this drive's Synths folder executable.");
+  if (r.noExec) n.push("Mounted noexec: this drive does not let MPC run programs from it, so plugins installed here would be listed but only show Load Plugin. Two ways forward: install on the internal drive (pick it above), or keep this drive and apply the auto exec patch in step 7 (Advanced), which makes the Synths folder of every noexec drive executable. If auto exec is already installed, it takes up to five seconds after the folder appears: connect again to rescan.");
   if (r.noSymlinks) n.push("Formatted " + r.fs + ", which cannot store symbolic links: a plugin that needs them (Crate Digger) cannot be installed here.");
   if (!r.inContent) n.push("MPC does not list this folder as a content location, so a plugin's screen may not show until you add it in MPC's settings.");
   if (!r.primary) n.push("If this drive is not in when MPC starts, its plugins drop out of MPC's plugin list until you register them again (step 5).");

@@ -124,8 +124,11 @@ func RunInstall(dev *Device, root Root, items []Item, workDir string, j *Job, re
 			}
 		}
 	}
+	if root.NoExec && dev.WaitExec(root.Path) { // an auto exec patch may just have made it executable
+		root, _ = dev.Info.root(root.Path)
+	}
 	if root.NoExec {
-		return fmt.Errorf("%s (%s) is mounted noexec, so MPC cannot load plugins from it: they would be listed but only show \"Load Plugin\". Pick the internal drive under Install to, or keep this drive and apply the drive exec patch (step 7, Advanced) first", root.Label, root.Path)
+		return fmt.Errorf("%s (%s) is mounted noexec, so MPC cannot load plugins from it: they would be listed but only show \"Load Plugin\". Pick the internal drive under Install to, or keep this drive and apply the auto exec patch (step 7, Advanced) first. If auto exec is already installed, wait five seconds and try again", root.Label, root.Path)
 	}
 	var need int64
 	for _, p := range pkgs {

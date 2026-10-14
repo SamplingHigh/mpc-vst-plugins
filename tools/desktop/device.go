@@ -337,7 +337,7 @@ for f in %s; do   # glibc 2.34 and later print their version when the library is
 done
 echo "libc=$libc"
 # mnt PATH: filesystem and options of the mount that holds PATH: the longest mount point on its path, the last one when stacked;
-# not df's, which names the drive for a bind mount of one folder (the drive exec patch remounts <drive>/Synths exec on a noexec drive)
+# not df's, which names the drive for a bind mount of one folder (the auto exec and drive exec patches remount <drive>/Synths exec on a noexec drive)
 mnt() {
   re=$(printf %%s "$1" | sed 's/ /\\040/g')   # /proc/mounts writes a space as \040
   R="$re" awk '{p = $2; if (p == "/" || ENVIRON["R"] == p || index(ENVIRON["R"], p "/") == 1) if (length(p) >= n) {n = length(p); t = $3; o = $4; m = p}} END {print t, o, m}' %s 2>/dev/null
@@ -516,7 +516,34 @@ func (d *Device) MakeRoot(drive string) error {
 	if code != 0 {
 		return fmt.Errorf("could not create %s/Synths: %s", dr.Path, strings.TrimSpace(strings.Join(out, " ")))
 	}
-	return d.readInfo(d.Info.Host, d.Info.Fingerprint)
+	if err := d.readInfo(d.Info.Host, d.Info.Fingerprint); err != nil {
+		return err
+	}
+	if dr.NoExec { // auto exec makes the new folder executable on its next pass: give it a moment
+		d.WaitExec(dr.Path + "/Synths")
+	}
+	return nil
+}
+
+// execWait is how long the app waits for a noexec location to turn executable (the auto exec patch acts within 5 seconds of
+// a drive or folder appearing). Tests set it to zero.
+var execWait = 8 * time.Second
+
+// WaitExec rescans until the location is no longer mounted noexec or execWait has passed, and returns whether it is executable.
+func (d *Device) WaitExec(path string) bool {
+	deadline := time.Now().Add(execWait)
+	for {
+		if r, ok := d.Info.root(path); ok && !r.NoExec {
+			return true
+		}
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		time.Sleep(1500 * time.Millisecond)
+		if d.readInfo(d.Info.Host, d.Info.Fingerprint) != nil {
+			return false
+		}
+	}
 }
 
 // problems lists why an install must not go ahead on this device (empty when it is fine).

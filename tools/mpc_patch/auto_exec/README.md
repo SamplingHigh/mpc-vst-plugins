@@ -1,6 +1,6 @@
 # Optional: auto exec, run plugins from any noexec drive (no setup)
 
-**UNTESTED on a device by this project.** Offline tests only (`tools/test_auto_exec.py`, real mounts in a private mount namespace). It succeeds `drive exec` (`../drive_exec`), which handles one named drive; keep that one until this has run on a device.
+**Device-verified 2026-10-14 on a Force Gen1** with two USB sticks: install, a plugin loaded from the stick, a power cycle, release. Not yet tried: the SSD, an eject without `release`. This replaces `drive exec` (`../drive_exec`, one named drive), which stays only so it can be uninstalled. Offline tests: `tools/test_auto_exec.py`.
 
 ## What the device does (device-verified 2026-10-14, NOTES)
 On a Force Gen1 the mount daemon `edisksd` mounts external drives `nosuid,nodev,noexec` (a USB stick showed it; the SSD report earlier). It has no config option for that, and MPC shares the shell's mount namespace. So the patch does not change how drives are mounted.
