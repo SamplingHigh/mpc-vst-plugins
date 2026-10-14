@@ -311,10 +311,11 @@ func (a *App) discard(w http.ResponseWriter, r *http.Request) {
 }
 
 type selection struct {
-	Catalog []string `json:"catalog"`
-	Uploads []string `json:"uploads"`
-	Root    string   `json:"root"` // the Synths folder to install into ("" = the internal drive)
-	Confirm bool     `json:"confirm"`
+	Catalog  []string `json:"catalog"`
+	Uploads  []string `json:"uploads"`
+	Root     string   `json:"root"`     // the Synths folder to install into ("" = the internal drive)
+	Register bool     `json:"register"` // InstallOpts.Register
+	Confirm  bool     `json:"confirm"`
 }
 
 // mkroot creates a Synths folder on a drive under /media that has none (Device.MakeRoot), so plugins can be installed there.
@@ -482,7 +483,7 @@ func (a *App) install(w http.ResponseWriter, r *http.Request) {
 		if a.dev == dev {
 			dev.readInfo(dev.Info.Host, dev.Info.Fingerprint)
 		}
-	})
+	}, InstallOpts{Register: s.Register})
 	writeJSON(w, 200, map[string]string{"job": j.ID})
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -63,7 +64,19 @@ func randHex(n int) string {
 
 // RunInstall downloads and checks what has to be downloaded, copies every package to the device, then installs them with MPC
 // stopped once and started once (packages whose installer predates -n run first, each with its own restart).
-func RunInstall(dev *Device, root Root, items []Item, workDir string, j *Job, refresh func()) (err error) {
+// InstallOpts are the page's choices beyond what to install and where.
+type InstallOpts struct {
+	// Register runs the app's own sync.sh after the install, while MPC is stopped for it: every plugin folder in
+	// every location gets into MPC's plugin list, nothing on the device needed. Like vstscanner.sh, but it only adds and fixes
+	// entries (and backs up MPC.settings) instead of rebuilding the list.
+	Register bool
+}
+
+func RunInstall(dev *Device, root Root, items []Item, workDir string, j *Job, refresh func(), opts ...InstallOpts) (err error) {
+	var o InstallOpts
+	if len(opts) > 0 {
+		o = opts[0]
+	}
 	defer func() {
 		if err == nil && refresh != nil {
 			refresh() // re-read what is on the device before the page is told it is done
@@ -175,7 +188,19 @@ func RunInstall(dev *Device, root Root, items []Item, workDir string, j *Job, re
 			return fmt.Errorf("copying %s failed (status %d): %v %s", p.Title, code, rerr, strings.Join(out, " "))
 		}
 	}
-	script := installScript(root.Path, dev.cfg.AddinsDir, tmp, pkgs)
+	syncRoots := ""
+	if o.Register {
+		for name, data := range map[string][]byte{"sync.sh": syncSH, "plugin_list.awk": pluginListAWK} {
+			code, rerr := dev.Run("mkdir -p "+shQuote(tmp+"/sync")+" && cat > "+shQuote(tmp+"/sync/"+name), bytes.NewReader(data), nil)
+			if rerr != nil || code != 0 {
+				cleanup()
+				return fmt.Errorf("cannot copy the plugin-list script to the device (status %d): %v", code, rerr)
+			}
+		}
+		syncRoots = dev.syncRoots()
+		j.log("After installing, every plugin folder on the device is registered with MPC (the app's own script; MPC.settings is backed up first)")
+	}
+	script := installScriptWith(root.Path, dev.cfg.AddinsDir, tmp, pkgs, dev.Info.Settings, syncRoots)
 	j.log("Installing (MPC is stopped once and started again at the end)")
 	code, rerr := dev.Run(script, nil, func(l string) { j.log("  %s", l) })
 	if rerr != nil {
@@ -192,6 +217,13 @@ func RunInstall(dev *Device, root Root, items []Item, workDir string, j *Job, re
 // itself); the rest run between one stop and one start. MPC is started again even when something fails. An addin installs to
 // <addins>/<id> and records its version in its own folder (addin.manifest), not in .mpc-store.
 func installScript(synths, addins, tmp string, pkgs []*Package) string {
+	return installScriptWith(synths, addins, tmp, pkgs, "", "")
+}
+
+// installScriptWith is installScript plus registering every plugin folder (InstallOpts.Register) once everything is in place,
+// while MPC is stopped for the batch, so MPC restarts once.
+// syncRoots, when not empty, runs sync.sh from $T/sync with those -t options while MPC is stopped (InstallOpts.Register).
+func installScriptWith(synths, addins, tmp string, pkgs []*Package, settings, syncRoots string) string {
 	var b strings.Builder
 	w := func(f string, a ...any) { fmt.Fprintf(&b, f+"\n", a...) }
 	w("T=%s; SYN=%s; STATE=\"$SYN/.mpc-store\"; rc=0", shQuote(tmp), shQuote(synths))
@@ -233,7 +265,16 @@ func installScript(synths, addins, tmp string, pkgs []*Package) string {
 	for _, p := range pkgs {
 		anyDefer = anyDefer || p.Defer
 	}
-	if anyDefer {
+	register := func() {
+		if syncRoots == "" {
+			return
+		}
+		w("if [ $rc = 0 ]; then")
+		w("  echo 'Registering every plugin folder with MPC'")
+		w(`  (cd "$T/sync" && MPC_SETTINGS=%s sh sync.sh -y -n%s) || { echo 'registering failed (see above): MPC.settings is unchanged unless it said Done'; rc=5; }`, shQuote(settings), syncRoots)
+		w("fi")
+	}
+	if anyDefer || syncRoots != "" { // MPC is stopped once for the batch and for registering
 		w("if [ $rc = 0 ]; then")
 		w("  systemctl stop $SVC")
 		w("  i=0; while pidof MPC >/dev/null && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done")
@@ -250,6 +291,7 @@ func installScript(synths, addins, tmp string, pkgs []*Package) string {
 			w("  else rc=1; fi")
 			w("fi")
 		}
+		register()
 		w("systemctl start $SVC")
 	}
 	w(`rm -rf "$T"`)

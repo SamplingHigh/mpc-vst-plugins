@@ -32,6 +32,11 @@ one MPC stop and start around the whole batch when the installers allow it.
    checking that the device presents the same key, and copies that package again; MPC is not stopped and nothing is installed
    until every copy is done, so this is safe. A second drop stops with "Nothing was installed and MPC was not stopped"
    (`TestACopyThatLosesTheConnectionIsRetriedOnce`, offline, 2026-10-14).
+   **Register every plugin folder** (ticked by default, under Install to; `InstallOpts.Register`): after the packages are in
+   place, and while MPC is still stopped for the batch, the app runs its own embedded `sync.sh` with every plugin location, so
+   folders you copied in by hand or that MPC forgot also get into MPC's plugin list, `MPC.settings` is backed up first, and MPC
+   restarts once. Nothing has to be on the device. If registering fails the job reports it and MPC is started again
+   (`TestInstallCanRegisterEveryPluginFolder`, `TestInstallWithoutRegisterLeavesHandCopiedFoldersAlone`, offline, 2026-10-14).
 
 4. **Remove** (step 4 on the page): lists the plugin folders on the device. A plugin the app can identify (from the catalog, or from a
    zip you dropped in this session) can be ticked and removed: MPC is stopped once, `MPC.settings` is backed up and the plugin's entry is

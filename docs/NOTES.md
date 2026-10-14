@@ -1445,3 +1445,7 @@ From saustin2010's Percolator 2.0.0 (four drum voices, a MIDI channel each, like
 - Our difference: after creating the folder the page selects it only if it is not `noexec` (the existing noexec guidance still applies; nothing here remounts a drive).
 - Tested offline: `TestADriveWithoutSynthsGetsOne` (fake device), `tools/desktop/ui_test/ui_drives.py` (stubbed API). NOT run on a real device.
 
+## 2026-10-14: installer app registers every plugin folder as part of an install (offline only)
+- Ported from the Android installer fork. A tick box under Install to (on by default) sends `register: true`; `RunInstall` copies the embedded `sync.sh` and `plugin_list.awk` to the device's private temp folder and the generated install script runs `sync.sh -y -n -t <each location>` after the packages, while MPC is stopped for the batch, so MPC restarts once. A failure (exit 5) is reported and MPC is started again. The separate "Register plugin folders" step (step 5) stays for repairs.
+- Tested offline with the fake device (`TestInstallCanRegisterEveryPluginFolder`, `TestInstallWithoutRegisterLeavesHandCopiedFoldersAlone`); NOT run on a real device. The user-reported value: plugin folders on a drive that was out when MPC started are dropped from the list and had to be registered again by hand.
+
