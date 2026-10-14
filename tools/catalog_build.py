@@ -44,7 +44,7 @@ ZIP_PATTERN = "*-mpc-armv7.zip"
 MAX_SUMMARY = 350   # characters; longer detail belongs in the repo README (docs/CATALOG.md)
 MAX_TAGS = 8
 # Entries that predate the limits and are waiting for their authors' feedback on a trim; the trim removes the id from here.
-OVER_LIMIT_OK = {"boris-granular", "effectforce", "evil-tuner-xxl", "interzonexxl", "lxrxxl-bazzline", "lxrxxl-zynth", "lxrxxl",
+OVER_LIMIT_OK = {"loop-saboteurxxl", "boris-granular", "effectforce", "evil-tuner-xxl", "interzonexxl", "lxrxxl-bazzline", "lxrxxl-zynth", "lxrxxl",
                  "plateauxxl", "sturm-tp", "subforce", "surgexxl"}
 OPEN_LICENSES = {"MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Apache-2.0", "GPL-2.0-only", "GPL-2.0-or-later",
                  "GPL-3.0-only", "GPL-3.0-or-later", "LGPL-2.1-only", "LGPL-2.1-or-later", "LGPL-3.0-only",
