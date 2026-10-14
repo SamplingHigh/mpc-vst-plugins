@@ -84,13 +84,13 @@ What was installed is written to `<Synths>/.mpc-store` on the device, so `mpc-st
 - The page is served on `127.0.0.1` only, behind a random token in the link the app prints. Every request must carry the token, the
   right `Host` and (for posts) the right `Origin`, and the page has a strict Content-Security-Policy, so other computers and other web
   pages cannot drive it.
-- The password is used for that one connection and never written down. There is no telemetry.
+- The password is used for that one connection and never written down. There is no telemetry. The one thing it fetches besides the catalog is the list of this repository's releases from `api.github.com` (an hourly check, 5 s timeout, nothing sent but the request) so the page can say when a newer `desktop-v*` release exists; it is silent when offline, skipped for a `dev` build, and `--no-update-check` turns it off.
 - Only https downloads are accepted, and only what the catalog lists.
 
 ## Run it
 
 Download the archive for your system from the releases, unpack it and start `mpc-installer` (double-click it, or run it in a
-terminal). It prints a link and opens it in your browser. `--no-browser` only prints the link; `--port`, `--catalog` and `--version`
+terminal). It prints a link and opens it in your browser. `--no-browser` only prints the link; `--port`, `--catalog`, `--no-update-check` and `--version`
 exist too.
 
 The first run is unsigned, so the system warns you once:

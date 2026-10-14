@@ -73,7 +73,7 @@ The catalog, its site and the installer app are live (see Done). Still open, in 
 ## Companion apps (catalog)
 - [ ] A custom domain for the site (the old `github.io` URL is hardcoded in `tools/mpc-store.sh`, the page template's `SITE` fallback, the desktop app and the README).
 
-- [ ] **Installer app: version check.** Tell the user when a newer `desktop-v*` release exists (asked for 2026-10-14). Ideas: compare the
+- [x] **Installer app: version check** (built 2026-10-14, host tests only; in 0.5.5). Original ask: Tell the user when a newer `desktop-v*` release exists (asked for 2026-10-14). Ideas: compare the
       app's `version` (skip a `dev` build) with the newest published release at startup, show a dismissible banner with the link
       and the "which file do I need?" table, never block or auto-update, fail silently offline; say in the docs what is fetched
       (the app already downloads the catalog, so it can read the version from the same site or the Releases API). The Android fork

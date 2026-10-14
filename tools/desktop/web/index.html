@@ -88,6 +88,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; }
 </head>
 <body>
 <div class="wrap">
+<div id="newver" class="small" hidden style="background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:10px 14px;margin-top:16px"></div>
 <header>
   <h1>MPC plugin installer</h1>
   <p class="lede">Install plugins from the catalog, or zips you already have, on your MPC or Force. This page runs on your computer only. Nothing about your device is saved.</p>
@@ -620,6 +621,14 @@ function poll(since, log, resultEl, doneText) {
     refresh();
   }).catch(function (e) { setTimeout(function () { poll(since, log, resultEl, doneText); }, 1500); });
 }
+
+api("/api/version").then(function (v) {
+  if (!v || !v.newer) return;
+  var b = $("newver"); b.textContent = "A newer installer is available: " + v.latest + " (you have " + v.current + "). ";
+  var a = el("a", null, "Download it"); a.href = v.url; a.target = "_blank"; a.rel = "noopener"; b.appendChild(a);
+  var x = el("button", null, "Dismiss"); x.type = "button"; x.style.marginLeft = "12px"; x.onclick = function () { b.hidden = true; }; b.appendChild(x);
+  b.hidden = false;
+}).catch(function () {});
 
 api("/api/state").then(function (st) {
   S.ups = st.uploads || []; drawUps();

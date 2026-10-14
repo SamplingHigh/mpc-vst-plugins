@@ -21,12 +21,15 @@ var indexHTML []byte
 // App is the local web server. It listens on 127.0.0.1 only and every request must carry the random token the app printed, so
 // nothing else on the network, and no web page open in the browser, can drive it. Nothing about the device is written to disk.
 type App struct {
-	cfg        Config
-	token      string
-	hosts      map[string]bool // accepted Host headers
-	catalogURL string
-	patchesURL string
-	work       string
+	cfg         Config
+	token       string
+	hosts       map[string]bool // accepted Host headers
+	catalogURL  string
+	patchesURL  string
+	releasesURL string // where the version check looks; empty = no check
+	verAt       time.Time
+	verInfo     versionInfo
+	work        string
 
 	mu      sync.Mutex
 	dev     *Device
@@ -43,7 +46,7 @@ type App struct {
 
 func NewApp(cfg Config, token, hostport, catalogURL, work string) *App {
 	port := hostport[strings.LastIndex(hostport, ":")+1:]
-	return &App{cfg: cfg, token: token, catalogURL: catalogURL, patchesURL: patchesURLFor(catalogURL), work: work, uploads: map[string]*Package{}, patchCode: map[string][]byte{},
+	return &App{cfg: cfg, token: token, catalogURL: catalogURL, releasesURL: defaultReleasesURL, patchesURL: patchesURLFor(catalogURL), work: work, uploads: map[string]*Package{}, patchCode: map[string][]byte{},
 		hosts: map[string]bool{"127.0.0.1:" + port: true, "localhost:" + port: true}}
 }
 
@@ -51,6 +54,7 @@ func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.index)
 	mux.HandleFunc("/api/state", a.state)
+	mux.HandleFunc("/api/version", a.versionAPI)
 	mux.HandleFunc("/api/connect", a.connect)
 	mux.HandleFunc("/api/disconnect", a.disconnect)
 	mux.HandleFunc("/api/catalog", a.catalog)
