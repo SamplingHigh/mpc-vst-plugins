@@ -104,7 +104,7 @@ func (fd *fakeDevice) cfg() Config {
 	aliases, _ := filepath.Glob(filepath.Join(fd.dir, "Aliases", "*", "Synths"))
 	roots = append(append(roots, aliases...), cards...)
 	return Config{Port: port, User: "root", RemoteTmp: filepath.Join(fd.dir, "tmp"), SynthsDir: filepath.Join(fd.dir, "Synths"),
-		RootGlobs: strings.Join(roots, " "), MountsFile: "/proc/mounts", SettingsGlob: filepath.Join(fd.dir, "Settings", "*", "MPC.settings"),
+		RootGlobs: strings.Join(roots, " "), DriveGlob: filepath.Join(fd.dir, "Drives", "*"), MountsFile: "/proc/mounts", SettingsGlob: filepath.Join(fd.dir, "Settings", "*", "MPC.settings"),
 		AddinsDir: filepath.Join(fd.dir, "addins"), LibcPaths: filepath.Join(fd.dir, "libc.so.6")}
 }
 

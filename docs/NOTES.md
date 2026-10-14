@@ -1439,3 +1439,9 @@ From saustin2010's Percolator 2.0.0 (four drum voices, a MIDI channel each, like
 - Ported from the Android installer fork (gmorb/mpc-installer-android, user-reported on a phone: "software caused connection abort" when the app lost the network mid-copy). Applies to the desktop app too (sleep, Wi-Fi or VPN change).
 - `Device.reconnect` dials again with the password kept in memory for the connection and refuses a device whose host key changed; `RunInstall` retries a package copy once (removing the half-copied folder first) and gives up with "Nothing was installed and MPC was not stopped" on a second drop. `connectionLost` treats a closed channel with no exit status (`ssh.ExitMissingError`) as a drop. Safe because MPC is only stopped after every copy has finished.
 - Tested offline with the fake SSH device cutting the connection when `tar -xf` starts (`TestACopyThatLosesTheConnectionIsRetriedOnce`); NOT run on a real device or a flaky network.
+
+## 2026-10-14: installer app can create a Synths folder on a drive that has none (offline only)
+- Ported from the Android installer fork. The scan (`readInfo`) also lists writable drives under `/media` (`Config.DriveGlob`, their own mount point only, not `az01-*`/`acvs-*`, not read-only) that have no `Synths` folder; the page shows a **Create Synths folder** button per drive; `Device.MakeRoot` runs `mkdir <drive>/Synths && sync` for a drive from the last scan only (a typed path is refused) and scans again, so the folder is a plugin location like any other.
+- Our difference: after creating the folder the page selects it only if it is not `noexec` (the existing noexec guidance still applies; nothing here remounts a drive).
+- Tested offline: `TestADriveWithoutSynthsGetsOne` (fake device), `tools/desktop/ui_test/ui_drives.py` (stubbed API). NOT run on a real device.
+

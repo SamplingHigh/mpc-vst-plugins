@@ -57,6 +57,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("/api/upload", a.upload)
 	mux.HandleFunc("/api/discard", a.discard)
 	mux.HandleFunc("/api/plan", a.plan)
+	mux.HandleFunc("/api/mkroot", a.mkroot)
 	mux.HandleFunc("/api/install", a.install)
 	mux.HandleFunc("/api/device", a.devicePlugins)
 	mux.HandleFunc("/api/remove", a.remove)
@@ -314,6 +315,35 @@ type selection struct {
 	Uploads []string `json:"uploads"`
 	Root    string   `json:"root"` // the Synths folder to install into ("" = the internal drive)
 	Confirm bool     `json:"confirm"`
+}
+
+// mkroot creates a Synths folder on a drive under /media that has none (Device.MakeRoot), so plugins can be installed there.
+func (a *App) mkroot(w http.ResponseWriter, r *http.Request) {
+	if !postOnly(w, r) {
+		return
+	}
+	var in struct{ Drive string }
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&in); err != nil {
+		fail(w, 400, "bad request")
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.dev == nil {
+		fail(w, 400, "connect to the device first")
+		return
+	}
+	if a.job != nil {
+		if st, _, _, _ := a.job.snapshot(0); st == "running" {
+			fail(w, 409, "an install is running: wait for it to finish")
+			return
+		}
+	}
+	if err := a.dev.MakeRoot(in.Drive); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"device": a.dev.Info, "problems": a.dev.Info.problems()})
 }
 
 // resolve turns a selection into install items. Caller holds a.mu.
