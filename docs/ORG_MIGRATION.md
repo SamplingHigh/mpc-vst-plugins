@@ -1,0 +1,71 @@
+# Moving to a GitHub organization: migration checklist
+
+Status: **draft, nothing done** (2026-10-14). Proposal from the community: create an org (working name "OpenMPC") for the
+structural repos, and optionally take in other developers' repos with their consent. This file is the plan and the
+list of what would break. Mark items as they are done, with the date and whether it was checked offline or on a device.
+
+## Decisions to make first
+- [ ] **Org name.** Check availability on GitHub, and check the name against Akai's trademarks before it looks "official".
+      (The site is already titled "Open MPC - Plugin Catalog".)
+- [ ] **Owners.** At least two, so no single account is a point of failure. Decide who gets merge rights on the catalog.
+- [ ] **What moves.** Proposed: `mpc-vst-plugins` (wrapper, tools, catalog, site, installer) and the ports `sd88me` owns.
+      Other developers' repos stay where they are and stay listed; an invitation to join is optional and needs their consent.
+- [ ] **Policy page** (review, yank, security contact, branding rule, who may merge). An official-looking org implies these.
+
+## What is hard-coded to `sd88me` (found offline, 2026-10-14)
+74 files mention it; 35 are `sd88me/mpc-vst-plugins`. The ones that matter at run time:
+
+| Where | What | Breaks if not handled |
+|---|---|---|
+| `tools/desktop/catalog.go` `defaultCatalogURL` | `https://sd88me.github.io/mpc-vst-plugins/catalog.json` | **Every installed copy of the desktop app.** Pages URLs are not redirected on transfer. |
+| `tools/mpc-store.sh` `URL=` | `.../catalog.tsv` (overridable with `MPC_STORE_URL`) | Copies already on devices. |
+| `tools/catalog_site/index.template.html` | `SITE` fallback | Minor (only when not served over http). |
+| `catalog/patches.json`, `docs/PATCHES.md` | `raw.githubusercontent.com/sd88me/mpc-vst-plugins/<commit>/...` | Raw URLs after a transfer: verify, do not assume. |
+| `.github/workflows/{vst,addin}-release.yml` and the docs that show them | `uses: sd88me/mpc-vst-plugins/.github/workflows/...@<sha>` | **Other developers' release workflows** pin this path. |
+| `catalog/plugins/*.json` | `repo` for ~23 `sd88me` entries | Catalog discovery if a repo moves and the entry is not updated. |
+| `README.md`, `catalog/pages/*.md`, `docs/*` | links | Cosmetic once redirects work. |
+| `docs/NOTES.md` | historical mentions | Leave alone; they are history. |
+
+## Facts to verify before relying on them
+GitHub's docs were not reachable from the agent session (network policy), so these come from search snippets or memory.
+Check each by hand, ideally on a throwaway repo and org first.
+- [ ] **Git and web links redirect after a transfer; GitHub Pages does not.** Search results (W3C's transfer guide, Boost list)
+      say so. Confirm in GitHub's current transfer docs.
+- [ ] **Do creating a new repo at the old name, or recreating the old repo to host a Pages redirect, break the redirect?**
+      The Boost thread says it can. Test before using that workaround.
+- [ ] **Does `uses: owner/repo/.github/workflows/x.yml@<sha>` follow a transfer redirect?** No source found. Test with a
+      scratch caller workflow. If not, every external release workflow needs a one-line edit.
+- [ ] **`releases/download/...` and `raw.githubusercontent.com` URLs after a transfer.** Test with a real release asset and a
+      pinned-commit raw URL.
+- [ ] Which settings travel with a transfer: Pages config, Actions secrets and variables, webhooks (the Discord release
+      workflow), branch protection, deploy keys, and the release-asset download counts the catalog shows.
+- [ ] Org Pages URL form (`<org>.github.io/mpc-vst-plugins/`) and whether a custom domain is wanted instead.
+
+## Sequence
+1. **Rehearse** on a scratch org and a scratch repo that mimics `mpc-vst-plugins` (Pages site, a release with an asset,
+   a pinned reusable workflow, a raw URL). Record what redirects.
+2. **Before the transfer**, ship a release of the desktop app and `mpc-store.sh` that already knows both catalog URLs
+   (try the new one, fall back to the old). Do this first because old installs cannot be updated after the old URL dies.
+3. **Create the org**, add owners, set base permissions, enable 2FA requirement, set up secrets again where needed.
+4. **Transfer `mpc-vst-plugins`.** Re-enable Pages from the Actions workflow, check the nightly `catalog.yml` run, the
+   site, `catalog.json`, `catalog.tsv` and `patches.json`.
+5. **Keep the old Pages URL alive** for as long as old clients exist: a redirect page published from the old owner
+   (a `sd88me.github.io` repo) or a copy of `catalog.json` that points at new download URLs. Test before relying on it.
+6. **One PR** replacing `sd88me/mpc-vst-plugins` in the table above, with a test that `tools/test_patches.py`,
+   the desktop tests and `catalog_check.py --catalog` still pass. Update docs in the same PR (CLAUDE.md "Docs sync").
+7. **Transfer the other `sd88me` ports** one at a time, each with its `catalog/plugins/<id>.json` `repo` update in the
+   same step. Run the catalog build after each.
+8. **Tell external plugin authors** (their entries and workflows keep working if redirects hold; give them the new `uses:` path).
+9. **Announce** with the policy page. Mention that listing does not require moving.
+10. **Archive the checklist** into `NOTES.md` (dated, with what was verified and where) and delete or trim this file.
+
+## Rollback
+Transfers can be reversed while the old name is free, so do not create anything at the old names until the new setup has run
+for a few catalog cycles. Keep the old Pages redirect and the dual-URL clients for at least one release cycle.
+
+## Prior art (from memory, not re-checked)
+- VCV Rack's `library` repo: one thread or manifest per plugin, authors keep their repos, maintainers build and update.
+  (README fetched 2026-10-14: updates are a version bump plus a commit hash posted to the plugin's thread; it does not
+  describe hosting.)
+- conda-forge: staged-recipes PR for first entry, then per-package repos kept up by bots.
+- Homebrew: curated core plus third-party taps.
