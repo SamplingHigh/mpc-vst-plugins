@@ -1487,3 +1487,7 @@ From saustin2010's Percolator 2.0.0 (four drum voices, a MIDI channel each, like
 - A `"tier": "experimental"` cap alone was not enough: it only hides the card on the site; `catalog.tsv` lists every stable,
   unyanked version whatever the tier.
 - To undo: once a fixed release is out, replace `"surgexxl@*"` with the bad versions (`"surgexxl@<version>"`) or remove it.
+
+## 2026-10-15: Maze Sequencer 1.0.7 and Model-72 1.0.0 verified working on a Gen2 (MPC Live III, MPC OS 3.9.1; device, user-reported)
+- User confirmed both aarch64 builds work on an MPC Live III running MPC OS 3.9.1: Maze Sequencer 1.0.7 (`sd88me/mpc-vst-maze`) and Model-72 1.0.0 (`sd88me/mpc-vst-model72`). We did not run them ourselves; no test details beyond "working" were given.
+- Recorded as a `MPC Live III (Gen2)` entry in each repo's `tested.json` (maze PR #17, model72 PR #1), so the catalog can show Verified Gen2 for the newest release of each after its next build. Model-72's release notes and its Force `tested.json` note still say Gen2 was only tested offline; they predate this report.
