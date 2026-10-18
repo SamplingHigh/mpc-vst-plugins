@@ -730,6 +730,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                                  "numFrames": frame_count - 1, "invert": False,
                                  "dragOrientation": "Vertical" if vert else "Horizontal", "handleName": "Data"}
                 bounds_version = 1 if inverted else 2
+                # A pull-down Knob's visual inversion must not invert the number printed below it.
+                # Bind that Label through its own handle so it reads the raw VST parameter directly.
+                value_handle = "Value" if inverted and not binding_inverted else "Data"
                 defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link", invert=binding_inverted, legacy=inverted),
                                                   _action("Double Click", "Show Overlay", "knob overlay", binding_inverted),
                                                   _action("Enter Pressed", "Show Overlay", "knob overlay", binding_inverted)], [
@@ -738,9 +741,10 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                     _name_label(0, name_y, cw, name_h, 17.0, INK, bounds_version=bounds_version,
                                 role="control_name"),
                     _value_label(0, value_y, cw, value_h, 22.0, INK_DIM, bounds_version=bounds_version,
-                                 role="control_value")],
+                                 handle=value_handle, role="control_value")],
                     version=2 if inverted else 4))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch,
+                                    extra={"Value": i} if value_handle == "Value" else None,
                                     invert=binding_inverted, bounds_version=bounds_version))
             elif kind == "meter" and lk and lk.get("look") == "native":
                 # EXPERIMENTAL, unverified (docs/ROADMAP.md "A native Meter component"): a real Meter component
