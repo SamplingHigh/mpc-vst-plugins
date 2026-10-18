@@ -391,9 +391,15 @@ def _sub(ctype, data, bnd, name=""):
             "handle remapping": {"version": 1, "map": []}, "bounds": bnd}
 
 
-def _action(on, handler, extra=""):
+def _action(on, handler, extra="", invert=False):
+    remap = []
+    if invert and handler == "Show Overlay":
+        # Stock AIR Organ drawbars expose an Invert/Data handle to their knob
+        # overlay, then map it back to the component's Data handle.
+        remap = [{"key": "Invert/*", "value": "*"},
+                 {"key": "Data", "value": "Invert/Data"}]
     return {"version": 2, "onAction": on, "handler": handler, "handleName": "" if handler == "Show Overlay" else "Data",
-            "additionalData": extra, "handle remapping": {"version": 1, "map": []}}
+            "additionalData": extra, "handle remapping": {"version": 1, "map": remap}}
 
 
 def _local(key, actions, children):
@@ -443,15 +449,17 @@ def _button(on_img, off_img, bid, n, w, h, x=0, y=0):
                 _bounds(x, y, w, h), "Button")
 
 
-def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None):
+def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False):
     """extra: {handle_name: param_index} for sub-widgets bound to a DIFFERENT parameter than the
     main "Data" handle -- e.g. a stepper's Q-Link/inc-dec target vs. the text it displays (that
     sub's def must itself use handleName=extra's key, see the stepper's "Text" label)."""
-    m = [{"key": "Data", "value": "Parameter %d" % index}]
+    target = "Parameter %d" % index
+    m = [{"key": "Data", "value": ("Invert/" if invert else "") + target}]
     for hname, hindex in (extra or {}).items():
         m.append({"key": hname, "value": "Parameter %d" % hindex})
     return {"version": 2,
-            "componentData": {"version": 1, "name": name, "type": ctype, "data": {"version": 1, "handleName": "Data"}},
+            "componentData": {"version": 1, "name": name, "type": ctype,
+                              "data": {"version": 1, "handleName": target if invert else "Data"}},
             "handle remapping": {"version": 1, "map": m},
             "bounds": _bounds(x, y - Y_OFF, w, h, focus=focus, show="Hide")}
 
@@ -621,8 +629,8 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 radii.add((r, lid))
                 key = "shKnob%d_w%d%s" % (r, cw, sfx)
                 defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link"),
-                                                  _action("Double Click", "Show Overlay", "knob overlay"),
-                                                  _action("Enter Pressed", "Show Overlay", "knob overlay")], [
+                                                  _action("Double Click", "Show Overlay", "knob overlay", inverted),
+                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", inverted)], [
                     _focus(cw, ch),
                     _sub("Knob", {"version": 5, "knobType": "FilmStrip", "filmStrip": "sh_knob_r%d%s.png" % (r, sfx),
                                   "numFrames": FRAMES - 1, "invert": False, "dragOrientation": "Vertical",
@@ -700,7 +708,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                                   "handleName": "Data"}, _bounds((cw - sq) // 2, 0, sq, sq), "Slider"),
                     _name_label(0, name_y, cw, name_h, 17.0, INK),
                     _value_label(0, value_y, cw, value_h, 22.0, INK_DIM)]))
-                kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch))
+                kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch, invert=inverted))
             elif kind == "meter" and lk and lk.get("look") == "native":
                 # EXPERIMENTAL, unverified (docs/ROADMAP.md "A native Meter component"): a real Meter component
                 # instead of a Knob/FilmStrip pretending to be one. inactiveImage is the constant background;
