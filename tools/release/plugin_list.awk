@@ -3,7 +3,7 @@
 #   awk -v mode=remove -v file=/sdcard/vst/x.so -f plugin_list.awk MPC.settings
 # Drops every <PLUGIN .../> (single- or multi-line) whose file= matches, then in add mode inserts the entry
 # into <VALUE name="pluginList-arm"><KNOWNPLUGINS>, creating the value before </PROPERTIES> if it's missing.
-function flush() {
+function emit_plugin() {
     if (index(buf, "file=\"" file "\"") == 0) print buf
     buf = ""
 }
@@ -11,8 +11,8 @@ BEGIN {
     if (mode == "add") { while ((getline l < entryfile) > 0) entry = entry l; close(entryfile) }
     done = 0; inlist = 0; buf = ""
 }
-buf != "" { buf = buf "\n" $0; if ($0 ~ /\/>/) flush(); next }
-/<PLUGIN( |$)/ { buf = $0; if ($0 ~ /\/>/) flush(); next }
+buf != "" { buf = buf "\n" $0; if ($0 ~ /\/>/) emit_plugin(); next }
+/<PLUGIN( |$)/ { buf = $0; if ($0 ~ /\/>/) emit_plugin(); next }
 /<VALUE name="pluginList-arm">/ { inlist = 1; print; next }
 inlist && /<KNOWNPLUGINS\/>/ {
     if (mode == "add") {
