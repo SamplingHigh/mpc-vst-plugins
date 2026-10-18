@@ -392,6 +392,11 @@ def _sub(ctype, data, bnd, name=""):
 
 
 def _action(on, handler, extra="", invert=False):
+    if invert and handler == "Q-Link":
+        # Stock AIR Organ drawbars use the older action format.  This keeps
+        # focus/Data Wheel/Q-Link control alive on their version-2 Knob.
+        return {"version": 1, "onAction": on, "handler": handler,
+                "handleName": "Data", "additionalData": extra}
     remap = []
     if invert and handler == "Show Overlay":
         # Stock AIR Organ drawbars expose an Invert/Data handle to their knob
@@ -402,12 +407,15 @@ def _action(on, handler, extra="", invert=False):
             "additionalData": extra, "handle remapping": {"version": 1, "map": remap}}
 
 
-def _local(key, actions, children):
+def _local(key, actions, children, version=4):
     clear = {"version": 1, "colour": "0", "image": ""}
-    return {"key": key, "value": {"version": 4, "actions": actions,
-                                  "backgroundData": {"version": 1, "focussed": clear, "unfocussed": clear},
-                                  "ignoreMousePresses": False, "disableCoarseDataWheel": False, "repeats": 1,
-                                  "hideQLinkBounds": False, "componentsData": children}}
+    value = {"version": version, "actions": actions,
+             "backgroundData": {"version": 1, "focussed": clear, "unfocussed": clear},
+             "ignoreMousePresses": False, "disableCoarseDataWheel": False,
+             "componentsData": children}
+    if version >= 4:
+        value.update({"repeats": 1, "hideQLinkBounds": False})
+    return {"key": key, "value": value}
 
 
 def _focus(w, h):
@@ -518,7 +526,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
         ppms.append((ppm, os.path.join(skin_dir, name + ".png")))
         return ppm
 
-    radii, sliders, looks = set(), set(), {}   # knob (r, look id), slider (image, w, h, vert, look id); look id -> look
+    radii, sliders, looks = set(), set(), {}   # slider: image,w,h,vertical,look id,frames,reverse artwork
     for t, tab in enumerate(tabs_in):
         kids, controls = [], []
         for w in tab["widgets"]:
@@ -689,25 +697,33 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 sw_, sh_ = w["w"], w["h"]
                 vert = kind == "slider_v"
                 img = "sh_%s_%dx%d%s" % (kind, sw_, sh_, sfx)
-                sliders.add((img, sw_, sh_, vert, lid))
+                inverted = w.get("invert") in ("1", "true", "True")
+                frame_count = int(lk.get("frames", FRAMES)) if lk else FRAMES
+                sliders.add((img, sw_, sh_, vert, lid, frame_count, inverted))
                 sq = max(sw_, sh_)   # filmstrip frames are square (as stock); padding is transparent
                 cw = max(130, sq)
                 name_y, name_h = (sq - sh_) // 2 + sh_ + 2, _native_box(17.0)
                 value_y = name_y + name_h + 2
                 value_h = _native_box(22.0)
                 ch = value_y + value_h + 6
-                inverted = w.get("invert") in ("1", "true", "True")
                 key = "shSlider_%s_%dx%d%s%s" % ("v" if vert else "h", sw_, sh_, sfx, "_inv" if inverted else "")
-                defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link"),
-                                                  _action("Double Click", "Show Overlay", "knob overlay"),
-                                                  _action("Enter Pressed", "Show Overlay", "knob overlay")], [
+                if inverted:
+                    # Match the stock AIR Organ drawbar exactly: its version-2 Knob expects
+                    # a frame count (9), has no dragOrientation, and uses an inverse handle.
+                    knob_data = {"version": 2, "knobType": "FilmStrip", "filmStrip": img + ".png",
+                                 "numFrames": frame_count, "invert": True, "handleName": "Data"}
+                else:
+                    knob_data = {"version": 5, "knobType": "FilmStrip", "filmStrip": img + ".png",
+                                 "numFrames": frame_count - 1, "invert": False,
+                                 "dragOrientation": "Vertical" if vert else "Horizontal", "handleName": "Data"}
+                defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link", invert=inverted),
+                                                  _action("Double Click", "Show Overlay", "knob overlay", inverted),
+                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", inverted)], [
                     _focus(cw, ch),
-                    _sub("Knob", {"version": 5, "knobType": "FilmStrip", "filmStrip": img + ".png",
-                                  "numFrames": FRAMES - 1, "invert": inverted,
-                                  "dragOrientation": "Vertical" if vert else "Horizontal",
-                                  "handleName": "Data"}, _bounds((cw - sq) // 2, 0, sq, sq), "Slider"),
+                    _sub("Knob", knob_data, _bounds((cw - sq) // 2, 0, sq, sq), "Slider"),
                     _name_label(0, name_y, cw, name_h, 17.0, INK),
-                    _value_label(0, value_y, cw, value_h, 22.0, INK_DIM)]))
+                    _value_label(0, value_y, cw, value_h, 22.0, INK_DIM)],
+                    version=2 if inverted else 4))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch, invert=inverted))
             elif kind == "meter" and lk and lk.get("look") == "native":
                 # EXPERIMENTAL, unverified (docs/ROADMAP.md "A native Meter component"): a real Meter component
@@ -734,7 +750,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
             elif kind == "meter":   # a filmstrip with no actions: it shows the parameter, touch does nothing
                 mw, mh = w["w"], w["h"]
                 img = "sh_meter_%dx%d%s" % (mw, mh, sfx)
-                sliders.add((img, mw, mh, 1, lid))
+                sliders.add((img, mw, mh, 1, lid, FRAMES, False))
                 sq = max(mw, mh)
                 key = "shMeter_%dx%d%s" % (mw, mh, sfx)
                 defs.setdefault(key, _local(key, [], [
@@ -877,11 +893,11 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 "ignoreMousePresses": False, "disableCoarseDataWheel": False, "repeats": 1,
                 "hideQLinkBounds": False, "componentsData": kids}}
 
-    for img, sw_, sh_, vert, lid in sorted(sliders):
+    for img, sw_, sh_, vert, lid, frame_count, reverse_art in sorted(sliders):
         if lid:
-            script.append("lsstrip|%s|%d|%d|%d|%d|%s" % (art(img), sw_, sh_, FRAMES, 1 if vert else 0, skin_assets.encode(looks[lid])))
+            script.append("lsstrip|%s|%d|%d|%d|%d|%s" % (art(img), sw_, sh_, frame_count, 1 if vert else 0, skin_assets.encode(looks[lid])))
         else:
-            script.append("sstrip|%s|%d|%d|%d|%d|%s" % (art(img), sw_, sh_, FRAMES, 1 if vert else 0, under()))
+            script.append("sstrip|%s|%d|%d|%d|%d|%s" % (art(img), sw_, sh_, frame_count, 1 if vert else 0, under()))
     for r, lid in sorted(radii):
         if lid:
             script.append("lstrip|%s|%d|%d|%s" % (art("sh_knob_r%d_%s" % (r, lid)), r, FRAMES, skin_assets.encode(looks[lid])))
@@ -906,22 +922,23 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
             x, y = w["cx"] + w["w"] // 2 - 22 - ox, w["cy"] - oy
             dr.polygon([(x - 8, y - 4), (x + 8, y - 4), (x, y + 5)], fill="#" + ACCENT)
         im.save(path)
-    for img, sw_, sh_, vert, lid in sliders:
-        square_strip(os.path.join(skin_dir, img + ".png"), sw_, sh_)
+    for img, sw_, sh_, vert, lid, frame_count, reverse_art in sliders:
+        square_strip(os.path.join(skin_dir, img + ".png"), sw_, sh_, reverse_art)
     for f in os.listdir(work):
         os.remove(os.path.join(work, f))
     os.rmdir(work)
     return list(defs.values()), pages, qmap
 
 
-def square_strip(path, w, h):
+def square_strip(path, w, h, reverse=False):
     """w x h frames -> square max(w,h) frames with the slider centred and transparent padding."""
     from PIL import Image
     src = Image.open(path).convert("RGBA")
     n, sq = src.size[1] // h, max(w, h)
     out = Image.new("RGBA", (sq, sq * n), (0, 0, 0, 0))
     for k in range(n):
-        out.paste(src.crop((0, k * h, w, (k + 1) * h)), ((sq - w) // 2, k * sq + (sq - h) // 2))
+        src_k = n - 1 - k if reverse else k
+        out.paste(src.crop((0, src_k * h, w, (src_k + 1) * h)), ((sq - w) // 2, k * sq + (sq - h) // 2))
     out.save(path)
 
 
