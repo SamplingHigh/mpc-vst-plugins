@@ -381,9 +381,12 @@ def baked_rect(w):
 
 # ---- TUI.json helpers ----
 
-def _bounds(x, y, w, h, focus="No", show="Show", visible="Always"):
-    return {"version": 2, "acceptsHWFocus": focus, "showWhenDataModelInvalid": show, "whenVisible": visible,
-            "boundsType": "Absolute", "bounds": "%d %d %d %d" % (x, y, w, h), "additionalInvalidatingHandles": []}
+def _bounds(x, y, w, h, focus="No", show="Show", visible="Always", version=2):
+    bounds = {"version": version, "acceptsHWFocus": focus, "showWhenDataModelInvalid": show,
+              "whenVisible": visible, "boundsType": "Absolute", "bounds": "%d %d %d %d" % (x, y, w, h)}
+    if version >= 2:
+        bounds["additionalInvalidatingHandles"] = []
+    return bounds
 
 
 def _sub(ctype, data, bnd, name=""):
@@ -391,8 +394,8 @@ def _sub(ctype, data, bnd, name=""):
             "handle remapping": {"version": 1, "map": []}, "bounds": bnd}
 
 
-def _action(on, handler, extra="", invert=False):
-    if invert and handler == "Q-Link":
+def _action(on, handler, extra="", invert=False, legacy=False):
+    if legacy and handler == "Q-Link":
         # Stock AIR Organ drawbars use the older action format.  This keeps
         # focus/Data Wheel/Q-Link control alive on their version-2 Knob.
         return {"version": 1, "onAction": on, "handler": handler,
@@ -418,10 +421,10 @@ def _local(key, actions, children, version=4):
     return {"key": key, "value": value}
 
 
-def _focus(w, h):
+def _focus(w, h, bounds_version=2):
     return _sub("Focus", {"version": 1, "backgroundColour": "14ffffff", "outlineColour": "ff" + ACCENT_HI,
                           "backgroundInset": 2.0, "outlineThickness": 2.0},
-                _bounds(0, 0, w, h, visible="WhenFocussed"), "Focus")
+                _bounds(0, 0, w, h, visible="WhenFocussed", version=bounds_version), "Focus")
 
 
 def _native_font_size(size):
@@ -434,21 +437,22 @@ def _native_box(size):
     return max(1, int(round(size * NATIVE_FONT_SCALE * float(os.environ.get("SHADOW_NATIVE_FONT_SCALE", "1")) + 5)))
 
 
-def _value_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred", handle="Data"):
+def _value_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred", handle="Data",
+                 bounds_version=2):
     return _sub("Label", {"version": 1, "textStyle": {"version": 1, "font": {"version": 1, "name": "Titillium Web",
                                                                          "style": "SemiBold", "height": _native_font_size(size)},
                                                    "colour": "ff" + colour, "justification": just, "case": "Original"},
-                          "type": "Value", "handleName": handle}, _bounds(x, y, w, h), "Value")
+                          "type": "Value", "handleName": handle}, _bounds(x, y, w, h, version=bounds_version), "Value")
 
 
-def _name_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred"):
+def _name_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred", bounds_version=2):
     """Control name via MPC's OWN native Titillium Web renderer (the assigned parameter's
     name, i.e. PARAMS[i].name from params.h) -- genuinely proportional, device-rendered text,
     unlike shadow_art.c's baked 9x9 bitmap font (see docs/NOTES.md's font-spacing entries)."""
     return _sub("Label", {"version": 1, "textStyle": {"version": 1, "font": {"version": 1, "name": "Titillium Web",
                                                                          "style": "SemiBold", "height": _native_font_size(size)},
                                                    "colour": "ff" + colour, "justification": just, "case": "Original"},
-                          "type": "Name", "handleName": "Data"}, _bounds(x, y, w, h), "Name")
+                          "type": "Name", "handleName": "Data"}, _bounds(x, y, w, h, version=bounds_version), "Name")
 
 
 def _button(on_img, off_img, bid, n, w, h, x=0, y=0):
@@ -457,7 +461,7 @@ def _button(on_img, off_img, bid, n, w, h, x=0, y=0):
                 _bounds(x, y, w, h), "Button")
 
 
-def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False):
+def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False, bounds_version=2):
     """extra: {handle_name: param_index} for sub-widgets bound to a DIFFERENT parameter than the
     main "Data" handle -- e.g. a stepper's Q-Link/inc-dec target vs. the text it displays (that
     sub's def must itself use handleName=extra's key, see the stepper's "Text" label)."""
@@ -469,7 +473,7 @@ def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=Fals
             "componentData": {"version": 1, "name": name, "type": ctype,
                               "data": {"version": 1, "handleName": target if invert else "Data"}},
             "handle remapping": {"version": 1, "map": m},
-            "bounds": _bounds(x, y - Y_OFF, w, h, focus=focus, show="Hide")}
+            "bounds": _bounds(x, y - Y_OFF, w, h, focus=focus, show="Hide", version=bounds_version)}
 
 
 def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
@@ -698,6 +702,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 vert = kind == "slider_v"
                 img = "sh_%s_%dx%d%s" % (kind, sw_, sh_, sfx)
                 inverted = w.get("invert") in ("1", "true", "True")
+                binding_inverted = w.get("param_invert") in ("1", "true", "True")
                 frame_count = int(lk.get("frames", FRAMES)) if lk else FRAMES
                 sliders.add((img, sw_, sh_, vert, lid, frame_count, inverted))
                 sq = max(sw_, sh_)   # filmstrip frames are square (as stock); padding is transparent
@@ -716,15 +721,17 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                     knob_data = {"version": 5, "knobType": "FilmStrip", "filmStrip": img + ".png",
                                  "numFrames": frame_count - 1, "invert": False,
                                  "dragOrientation": "Vertical" if vert else "Horizontal", "handleName": "Data"}
-                defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link", invert=inverted),
-                                                  _action("Double Click", "Show Overlay", "knob overlay", inverted),
-                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", inverted)], [
-                    _focus(cw, ch),
-                    _sub("Knob", knob_data, _bounds((cw - sq) // 2, 0, sq, sq), "Slider"),
-                    _name_label(0, name_y, cw, name_h, 17.0, INK),
-                    _value_label(0, value_y, cw, value_h, 22.0, INK_DIM)],
+                bounds_version = 1 if inverted else 2
+                defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link", invert=binding_inverted, legacy=inverted),
+                                                  _action("Double Click", "Show Overlay", "knob overlay", binding_inverted),
+                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", binding_inverted)], [
+                    _focus(cw, ch, bounds_version),
+                    _sub("Knob", knob_data, _bounds((cw - sq) // 2, 0, sq, sq, version=bounds_version), "Slider"),
+                    _name_label(0, name_y, cw, name_h, 17.0, INK, bounds_version=bounds_version),
+                    _value_label(0, value_y, cw, value_h, 22.0, INK_DIM, bounds_version=bounds_version)],
                     version=2 if inverted else 4))
-                kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch, invert=inverted))
+                kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch,
+                                    invert=binding_inverted, bounds_version=bounds_version))
             elif kind == "meter" and lk and lk.get("look") == "native":
                 # EXPERIMENTAL, unverified (docs/ROADMAP.md "A native Meter component"): a real Meter component
                 # instead of a Knob/FilmStrip pretending to be one. inactiveImage is the constant background;
