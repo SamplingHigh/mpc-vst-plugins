@@ -85,6 +85,7 @@ THEME_KEYS = {"bg": "PLATE", "ink": "INK", "ink_dim": "INK_DIM", "accent": "ACCE
 
 FONT_LABEL_PATH = None   # font_label=<path> (layout.conf top level) -- see apply_theme()
 NATIVE_FONT_SCALE = 1.0  # native_font_scale=<factor>; SHADOW_NATIVE_FONT_SCALE can further override it
+NATIVE_FONT_SIZES = {}   # native_font_<role>=<final px>, e.g. native_font_control_name=30
 
 def text_width(s, scale=1.15):          # sizes a button's TUI.json bounds; must use the same SCALE as
                                          # widget_button()'s own draw call there (render_conf_preview.c).
@@ -157,6 +158,7 @@ def apply_theme(top):
     never rasterizes with it, that's still all done by shadow_art (render_conf_preview.c)."""
     g = globals()
     g["LOOK_DEFAULTS"] = skin_assets.defaults(top)
+    g["NATIVE_FONT_SIZES"] = {}
     for line in top:
         if line.strip() == "style=td3":
             g["TD3"] = True
@@ -166,6 +168,9 @@ def apply_theme(top):
         k, _, v = line.partition("=")
         if k == "native_font_scale":
             g["NATIVE_FONT_SCALE"] = max(0.5, float(v.strip()))
+            continue
+        if k.startswith("native_font_"):
+            g["NATIVE_FONT_SIZES"][k[len("native_font_"):]] = max(1.0, float(v.strip()))
             continue
         if k.startswith("theme_") and k[6:] in THEME_KEYS:
             g[THEME_KEYS[k[6:]]] = v.strip()
@@ -427,30 +432,33 @@ def _focus(w, h, bounds_version=2):
                 _bounds(0, 0, w, h, visible="WhenFocussed", version=bounds_version), "Focus")
 
 
-def _native_font_size(size):
+def _native_font_size(size, role=None):
     """Optional per-build scaling for MPC-rendered labels; baked artwork is unchanged."""
+    if role in NATIVE_FONT_SIZES:
+        return round(NATIVE_FONT_SIZES[role], 1)
     return round(size * NATIVE_FONT_SCALE * float(os.environ.get("SHADOW_NATIVE_FONT_SCALE", "1")), 1)
 
 
-def _native_box(size):
+def _native_box(size, role=None):
     """Height for a native label box at the selected scale, with a little vertical breathing room."""
-    return max(1, int(round(size * NATIVE_FONT_SCALE * float(os.environ.get("SHADOW_NATIVE_FONT_SCALE", "1")) + 5)))
+    return max(1, int(round(_native_font_size(size, role) + 5)))
 
 
 def _value_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred", handle="Data",
-                 bounds_version=2):
+                 bounds_version=2, role=None):
     return _sub("Label", {"version": 1, "textStyle": {"version": 1, "font": {"version": 1, "name": "Titillium Web",
-                                                                         "style": "SemiBold", "height": _native_font_size(size)},
+                                                                         "style": "SemiBold", "height": _native_font_size(size, role)},
                                                    "colour": "ff" + colour, "justification": just, "case": "Original"},
                           "type": "Value", "handleName": handle}, _bounds(x, y, w, h, version=bounds_version), "Value")
 
 
-def _name_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred", bounds_version=2):
+def _name_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred", bounds_version=2,
+                role=None):
     """Control name via MPC's OWN native Titillium Web renderer (the assigned parameter's
     name, i.e. PARAMS[i].name from params.h) -- genuinely proportional, device-rendered text,
     unlike shadow_art.c's baked 9x9 bitmap font (see docs/NOTES.md's font-spacing entries)."""
     return _sub("Label", {"version": 1, "textStyle": {"version": 1, "font": {"version": 1, "name": "Titillium Web",
-                                                                         "style": "SemiBold", "height": _native_font_size(size)},
+                                                                         "style": "SemiBold", "height": _native_font_size(size, role)},
                                                    "colour": "ff" + colour, "justification": just, "case": "Original"},
                           "type": "Name", "handleName": "Data"}, _bounds(x, y, w, h, version=bounds_version), "Name")
 
@@ -634,22 +642,22 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
             if kind == "knob":
                 r = w["r"]
                 s, cw = 2 * r + 10, max(w.get("cw", 130), 2 * r + 10)
-                name_y, name_h = s // 2 + r + 2, _native_box(17.0)
+                name_y, name_h = s // 2 + r + 2, _native_box(17.0, "control_name")
                 value_y = name_y + name_h + 2
-                value_h = _native_box(22.0)
+                value_h = _native_box(22.0, "control_value")
                 ch = value_y + value_h + 6
                 radii.add((r, lid))
                 key = "shKnob%d_w%d%s" % (r, cw, sfx)
                 defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link"),
-                                                  _action("Double Click", "Show Overlay", "knob overlay", inverted),
-                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", inverted)], [
+                                                  _action("Double Click", "Show Overlay", "knob overlay"),
+                                                  _action("Enter Pressed", "Show Overlay", "knob overlay")], [
                     _focus(cw, ch),
                     _sub("Knob", {"version": 5, "knobType": "FilmStrip", "filmStrip": "sh_knob_r%d%s.png" % (r, sfx),
                                   "numFrames": FRAMES - 1, "invert": False, "dragOrientation": "Vertical",
                                   "handleName": "Data"}, _bounds((cw - s) // 2, 0, s, s), "Knob"),
-                    _name_label(0, name_y, cw, name_h, 17.0, INK),
+                    _name_label(0, name_y, cw, name_h, 17.0, INK, role="control_name"),
                     _sub("Label", {"version": 1, "textStyle": {"version": 1, "font": {"version": 1, "name": "Titillium Web",
-                                                                                     "style": "SemiBold", "height": _native_font_size(22.0)},
+                                                                                     "style": "SemiBold", "height": _native_font_size(22.0, "control_value")},
                                                                "colour": "ff" + INK_DIM,
                                                                "justification": "horizontallyCentred verticallyCentred",
                                                                "case": "Upper Case"},
@@ -660,7 +668,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 tw, th = skin_assets.toggle_size(w, lk)
                 cw = max(w.get("cw", 120), tw + 10)
                 key = "shToggle_%s_%dx%d_w%d" % (lid, tw, th, cw)
-                name_h = _native_box(15.0)
+                name_h = _native_box(15.0, "toggle_name")
                 ch = th + name_h + 6
                 if key not in defs:
                     img = "sh_tog_%s_%dx%d" % (lid, tw, th)
@@ -669,12 +677,12 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                                    "crop|%s|200|300|%d|%d" % (art("%s_%s" % (img, "on" if on else "off")), tw, th)]
                     defs[key] = _local(key, [_action("Mouse Down", "Q-Link"), _action("Enter Pressed", "Toggle Switch")],
                                        [_focus(cw, ch), _button(img + "_on.png", img + "_off.png", 1, 1, tw, th, (cw - tw) // 2, 0),
-                                         _name_label(0, th + 4, cw, name_h, 15.0, INK)])
+                                         _name_label(0, th + 4, cw, name_h, 15.0, INK, role="toggle_name")])
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - th // 2, cw, ch))
             elif kind == "toggle":
                 cw = max(120, w.get("cw", 120))
                 key = "shToggle_w%d" % cw
-                name_h = _native_box(15.0)
+                name_h = _native_box(15.0, "toggle_name")
                 toggle_h = 38 + name_h + 4
                 if key not in defs:
                     for on in (0, 1):
@@ -682,7 +690,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                                    "crop|%s|74|86|53|29" % art("sh_pill_%s" % ("on" if on else "off"))]
                     defs[key] = _local(key, [_action("Mouse Down", "Q-Link"), _action("Enter Pressed", "Toggle Switch")],
                                        [_focus(cw, toggle_h), _button("sh_pill_on.png", "sh_pill_off.png", 1, 1, 53, 29, (cw - 53) // 2, 4),
-                                        _name_label(0, 34, cw, name_h, 15.0, INK)])
+                                        _name_label(0, 34, cw, name_h, 15.0, INK, role="toggle_name")])
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - 18, cw, toggle_h))
             elif kind == "button":
                 x, y, bw, bh = button_rect(w, base_dir)
@@ -707,9 +715,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 sliders.add((img, sw_, sh_, vert, lid, frame_count, inverted))
                 sq = max(sw_, sh_)   # filmstrip frames are square (as stock); padding is transparent
                 cw = max(130, sq)
-                name_y, name_h = (sq - sh_) // 2 + sh_ + 2, _native_box(17.0)
+                name_y, name_h = (sq - sh_) // 2 + sh_ + 2, _native_box(17.0, "control_name")
                 value_y = name_y + name_h + 2
-                value_h = _native_box(22.0)
+                value_h = _native_box(22.0, "control_value")
                 ch = value_y + value_h + 6
                 key = "shSlider_%s_%dx%d%s%s" % ("v" if vert else "h", sw_, sh_, sfx, "_inv" if inverted else "")
                 if inverted:
@@ -727,8 +735,10 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                                                   _action("Enter Pressed", "Show Overlay", "knob overlay", binding_inverted)], [
                     _focus(cw, ch, bounds_version),
                     _sub("Knob", knob_data, _bounds((cw - sq) // 2, 0, sq, sq, version=bounds_version), "Slider"),
-                    _name_label(0, name_y, cw, name_h, 17.0, INK, bounds_version=bounds_version),
-                    _value_label(0, value_y, cw, value_h, 22.0, INK_DIM, bounds_version=bounds_version)],
+                    _name_label(0, name_y, cw, name_h, 17.0, INK, bounds_version=bounds_version,
+                                role="control_name"),
+                    _value_label(0, value_y, cw, value_h, 22.0, INK_DIM, bounds_version=bounds_version,
+                                 role="control_value")],
                     version=2 if inverted else 4))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch,
                                     invert=binding_inverted, bounds_version=bounds_version))
@@ -771,7 +781,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 overlay = [_action("Mouse Down", "Show Overlay", "menu overlay"),
                            _action("Double Click", "Show Overlay", "menu overlay"),
                            _action("Enter Pressed", "Show Overlay", "menu overlay")]
-                defs.setdefault(key, _local(key, overlay, [_focus(rw, rh), _value_label(8, 0, rw - 16, rh, 26.0, ACCENT)]))
+                defs.setdefault(key, _local(key, overlay, [_focus(rw, rh),
+                                                           _value_label(8, 0, rw - 16, rh, 26.0, ACCENT,
+                                                                        role="readout_value")]))
                 kids.append(_placed(key, name, i, x, y, rw, rh))
             elif kind == "popup":
                 # Data = the "open" flag (a tap toggles it); Text = the enum, whose value the field shows.
@@ -781,7 +793,8 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 x, y, rw, rh = w["cx"] - w["w"] // 2, w["cy"] - w["h"] // 2, w["w"], w["h"]
                 key = "shPopField_%dx%d" % (rw, rh)
                 defs.setdefault(key, _local(key, [_action("Mouse Down", "Toggle Switch"), _action("Enter Pressed", "Toggle Switch")],
-                                            [_focus(rw, rh), _value_label(8, 0, rw - 44, rh, 26.0, ACCENT, handle="Text")]))
+                                            [_focus(rw, rh), _value_label(8, 0, rw - 44, rh, 26.0, ACCENT,
+                                                                         handle="Text", role="readout_value")]))
                 kids.append(_placed(key, name, oi, x, y, rw, rh, extra={"Text": i}))
                 (px, py, pw, ph), orects = popup_panel(w)
                 shown = "IndexedEnabling/1/2/Parameter %d" % oi
@@ -811,7 +824,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 x, y, rw, rh = w["cx"] - w["w"] // 2, w["cy"] - w["h"] // 2, w["w"], w["h"]
                 dot = w.get("style") == "dotmatrix"
                 key = "shReadout_%s%dx%d" % ("dot_" if dot else "", rw, rh)
-                defs.setdefault(key, _local(key, [], [_value_label(8, 0, rw - 16, rh, 26.0, DISPLAY_INK if dot else ACCENT)]))
+                defs.setdefault(key, _local(key, [], [_value_label(8, 0, rw - 16, rh, 26.0,
+                                                                    DISPLAY_INK if dot else ACCENT,
+                                                                    role="readout_value")]))
                 kids.append(_placed(key, name, i, x, y, rw, rh, focus="No"))
             elif kind == "stepper":
                 x0, y0 = w["cx"] - w["w"] // 2, w["cy"] - w["h"] // 2
@@ -834,8 +849,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link"),
                                                   _action("Double Click", "Show Overlay", "knob overlay")],
                                             [_focus(w["w"] - 2 * h - 6, h),
-                                              _value_label(8, 0, w["w"] - 2 * h - 22, h, 26.0, DISPLAY_INK if dot else ACCENT,
-                                                           handle=value_handle)]))
+                                              _value_label(8, 0, w["w"] - 2 * h - 22, h, 26.0,
+                                                           DISPLAY_INK if dot else ACCENT,
+                                                           handle=value_handle, role="readout_value")]))
                 kids.append(_placed(key, name, i, x0 + h + 3, y0, w["w"] - 2 * h - 6, h,
                                     extra=extra_handles))
                 for side, (ax, ay, aw, ah) in zip(("prev", "next"), stepper_arrows(w)):
