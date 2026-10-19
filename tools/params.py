@@ -2,7 +2,8 @@
 
 Generic format (params.json): {"name": "...", "params": [...], "sections": [{"label": "...", "keys": [...]}]}
 or just the list. Each param: key, name, and either min/max (+ unit) or options; optional default,
-momentary (a trigger that reports back to 0), display ("string" | "int"), step_of/step_delta, type
+momentary (a trigger that reports back to 0), display ("string" | "int"), display_key (alternate
+DSP key used only for the shown value), step_of/step_delta, type
 (the studio's widget hint: readout, stepper, trigger, slot). The list order is the VST parameter index.
 
 Engines from other ecosystems bring their own parameter files through adapters/ (e.g.

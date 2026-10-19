@@ -267,8 +267,10 @@ static intptr_t dispatcher(AEffect *e, int32_t op, int32_t idx, intptr_t v, void
         if (pp->nopts) {
             int k = (int)lroundf(get_norm(w, idx) * (pp->nopts - 1));
             copy_str(p, pp->opts[k], 24);
-        } else if (g_api->get_param(w->dsp, pp->key, buf, sizeof buf) > 0) {
-            if (pp->string_display) copy_str(p, buf, 24);   /* real text (a name, a status), not a number */
+        } else if (g_api->get_param(w->dsp,
+                                    pp->display_key[0] ? pp->display_key : pp->key,
+                                    buf, sizeof buf) > 0) {
+            if (pp->display_key[0] || pp->string_display) copy_str(p, buf, 24); /* real text, not a number */
             else snprintf(p, 24, "%.*f", (pp->int_display || fabs(pp->max - pp->min) > 20) ? 0 : 1, atof(buf));
         }
         return 1;
