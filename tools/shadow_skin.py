@@ -469,14 +469,16 @@ def _button(on_img, off_img, bid, n, w, h, x=0, y=0):
                 _bounds(x, y, w, h), "Button")
 
 
-def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False, bounds_version=2):
+def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False, bounds_version=2,
+            extra_invert=()):
     """extra: {handle_name: param_index} for sub-widgets bound to a DIFFERENT parameter than the
     main "Data" handle -- e.g. a stepper's Q-Link/inc-dec target vs. the text it displays (that
     sub's def must itself use handleName=extra's key, see the stepper's "Text" label)."""
     target = "Parameter %d" % index
     m = [{"key": "Data", "value": ("Invert/" if invert else "") + target}]
     for hname, hindex in (extra or {}).items():
-        m.append({"key": hname, "value": "Parameter %d" % hindex})
+        extra_target = "Parameter %d" % hindex
+        m.append({"key": hname, "value": ("Invert/" if hname in extra_invert else "") + extra_target})
     return {"version": 2,
             "componentData": {"version": 1, "name": name, "type": ctype,
                               "data": {"version": 1, "handleName": target if invert else "Data"}},
@@ -745,7 +747,8 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                     version=2 if inverted else 4))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch,
                                     extra={"Value": i} if value_handle == "Value" else None,
-                                    invert=binding_inverted, bounds_version=bounds_version))
+                                    invert=binding_inverted, bounds_version=bounds_version,
+                                    extra_invert=("Value",) if value_handle == "Value" else ()))
             elif kind == "meter" and lk and lk.get("look") == "native":
                 # EXPERIMENTAL, unverified (docs/ROADMAP.md "A native Meter component"): a real Meter component
                 # instead of a Knob/FilmStrip pretending to be one. inactiveImage is the constant background;
