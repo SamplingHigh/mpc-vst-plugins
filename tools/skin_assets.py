@@ -3,7 +3,7 @@
 A control's look comes from its layout line, else from a top-level default for its group:
 
     knob     look=moog | img=knob.png [base=scale.png] | strip=knobs.png [frames=N]
-    slider_v / slider_h   look=fader | img=cap.png [base=track.png] | strip=fader.png [frames=N]
+    slider_v / slider_h   look=fader [fill=RRGGBB] | img=cap.png [base=track.png] | strip=fader.png [frames=N]
     toggle   look=led | img=off.png [img_on=on.png] [w= h=]
     button   img=pad.png [img_on=pad_lit.png] [w= h=]          (the label is drawn on top; label="" for none)
     enum_h / enum_v   img=seg.png [img_on=seg_lit.png]         (each option: the image, its name on top)
@@ -37,7 +37,7 @@ import struct
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
         ".svg": "image/svg+xml"}
-ATTRS = ("look", "img", "img_on", "base", "strip", "frames", "peak", "rms")
+ATTRS = ("look", "img", "img_on", "base", "strip", "frames", "peak", "rms", "fill")
 FILE_ATTRS = ("img", "img_on", "base", "strip", "peak", "rms")
 GROUP = {"knob": "knob", "slider_v": "slider", "slider_h": "slider", "toggle": "toggle", "button": "button",
          "enum_h": "seg", "enum_v": "seg", "frame": "frame", "popup": "popup", "meter": "meter"}
@@ -151,6 +151,8 @@ def check(w, look):
         return "%s: only img= (a panel picture)" % w["kind"]
     if look.get("look") and look["look"] not in LOOKS[g]:
         return "look=%s: %s has %s" % (look["look"], w["kind"], ", ".join(LOOKS[g]) + " or drawn" if LOOKS[g] else "no built-in looks (use img=)")
+    if "fill" in look and not re.fullmatch(r"#?[0-9a-fA-F]{6}", str(look["fill"])):
+        return "fill=%s: expected a six-digit RGB colour" % look["fill"]
     for a in FILE_ATTRS:
         if a in look and not os.path.isfile(look[a]):
             return "%s=%s: no such file" % (a, look[a])

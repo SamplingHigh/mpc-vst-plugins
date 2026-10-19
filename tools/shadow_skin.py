@@ -37,7 +37,7 @@ Layout file:
                                                         "Native `Meter` component: breaks the whole page";
                                                         kept only so tools/skin_assets.py can refuse it with a
                                                         clear message. Use the filmstrip meter above.)
-Controls can have looks: built-in drawings or images (look=, img=, img_on=, base=, strip=, frames=, peak=, rms=;
+Controls can have looks: built-in drawings or images (look=, img=, img_on=, base=, strip=, frames=, peak=, rms=, fill=;
 frames and popups take img=), per line or as top-level defaults (knob_look=moog): see tools/skin_assets.py. Looks,
 images and pictures need the browser renderer.
     qlinks  "PAGE NAME" = key,key,...                  (optional, repeatable)

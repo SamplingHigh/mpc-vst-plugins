@@ -133,9 +133,10 @@ def fader_track(x, y, w, h, vert, th):
     return o
 
 
-def fader_cap(x, y, w, h, vert):
+def fader_cap(x, y, w, h, vert, fill=None):
     """A fader cap filling the box x,y,w,h, with grip ridges and a centre line."""
-    o = '<rect class="look-fader" x="%g" y="%g" width="%g" height="%g" rx="3"/>' % (x, y, w, h)
+    style = ' style="fill:%s"' % hexc(fill) if fill else ""
+    o = '<rect class="look-fader"%s x="%g" y="%g" width="%g" height="%g" rx="3"/>' % (style, x, y, w, h)
     if vert:
         for f in (0.25, 0.75):
             o += '<line class="look-ridge" x1="%g" y1="%g" x2="%g" y2="%g"/>' % (x + 3, y + h * f, x + w - 3, y + h * f)
@@ -301,7 +302,7 @@ class Art:
         if look.get("img"):
             thumb = self.image(look["img"], tx, ty, tw, th)
         elif fader:
-            thumb = fader_cap(tx, ty, tw, th, vert)
+            thumb = fader_cap(tx, ty, tw, th, vert, look.get("fill"))
         return '<g class="slider look-%s">%s%s</g>' % (look.get("look", "image"), track, thumb)
 
     def toggle_frame(self, cx, cy, on, w, h, look):
