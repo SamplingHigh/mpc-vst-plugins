@@ -163,6 +163,22 @@ static void setParameter(AEffect *e, int32_t i, float n) {
             if (idx > p->nopts - 1) idx = p->nopts - 1;
             n = (float)idx / (p->nopts - 1);
         }
+    } else if (p->int_display && p->max > p->min) {
+        /* MPC encoders send a small continuous delta even for whole-number
+         * parameters.  The DSP then rounds that delta back to the current
+         * integer, making Data Wheel/Q-Link turns appear dead.  A sub-half-step
+         * move is an encoder nudge; larger moves (touch) select the nearest
+         * absolute integer. */
+        float span = p->max - p->min;
+        float requested = p->min + clamp01(n) * span;
+        float current = p->min + get_norm(w, i) * span;
+        float next = roundf(requested);
+        float delta = requested - current;
+        if (fabsf(delta) > 0.0001f && fabsf(delta) < 0.5f)
+            next = roundf(current) + (delta > 0 ? 1.0f : -1.0f);
+        if (next < p->min) next = p->min;
+        if (next > p->max) next = p->max;
+        n = (next - p->min) / span;
     }
     norm_to_str(p, n, buf, sizeof buf);
     g_api->set_param(w->dsp, PARAMS[i].key, buf);

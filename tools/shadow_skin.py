@@ -400,11 +400,11 @@ def _sub(ctype, data, bnd, name=""):
 
 
 def _action(on, handler, extra="", invert=False, legacy=False):
-    if legacy and handler == "Q-Link":
-        # Stock AIR Organ drawbars use the older action format.  This keeps
-        # focus/Data Wheel/Q-Link control alive on their version-2 Knob.
+    if legacy and not invert:
+        # Older version-2 local components (including working stock/custom
+        # knobs) use version-1 actions for Q-Link, overlay and Enter handling.
         return {"version": 1, "onAction": on, "handler": handler,
-                "handleName": "Data", "additionalData": extra}
+                "handleName": "" if handler == "Show Overlay" else "Data", "additionalData": extra}
     remap = []
     if invert and handler == "Show Overlay":
         # Stock AIR Organ drawbars expose an Invert/Data handle to their knob
@@ -469,16 +469,14 @@ def _button(on_img, off_img, bid, n, w, h, x=0, y=0):
                 _bounds(x, y, w, h), "Button")
 
 
-def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False, bounds_version=2,
-            extra_invert=()):
+def _placed(ctype, name, index, x, y, w, h, focus="Yes", extra=None, invert=False, bounds_version=2):
     """extra: {handle_name: param_index} for sub-widgets bound to a DIFFERENT parameter than the
     main "Data" handle -- e.g. a stepper's Q-Link/inc-dec target vs. the text it displays (that
     sub's def must itself use handleName=extra's key, see the stepper's "Text" label)."""
     target = "Parameter %d" % index
     m = [{"key": "Data", "value": ("Invert/" if invert else "") + target}]
     for hname, hindex in (extra or {}).items():
-        extra_target = "Parameter %d" % hindex
-        m.append({"key": hname, "value": ("Invert/" if hname in extra_invert else "") + extra_target})
+        m.append({"key": hname, "value": "Parameter %d" % hindex})
     return {"version": 2,
             "componentData": {"version": 1, "name": name, "type": ctype,
                               "data": {"version": 1, "handleName": target if invert else "Data"}},
@@ -731,24 +729,23 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                     knob_data = {"version": 5, "knobType": "FilmStrip", "filmStrip": img + ".png",
                                  "numFrames": frame_count - 1, "invert": False,
                                  "dragOrientation": "Vertical" if vert else "Horizontal", "handleName": "Data"}
-                bounds_version = 1 if inverted else 2
-                # A pull-down Knob's visual inversion must not invert the number printed below it.
-                # Bind that Label through its own handle so it reads the raw VST parameter directly.
-                value_handle = "Value" if inverted and not binding_inverted else "Data"
+                # Version-2 local controls still use version-2 bounds in working
+                # MPC skins; version-1 bounds prevent hardware focus on Force.
+                bounds_version = 2
                 defs.setdefault(key, _local(key, [_action("Mouse Down", "Q-Link", invert=binding_inverted, legacy=inverted),
-                                                  _action("Double Click", "Show Overlay", "knob overlay", binding_inverted),
-                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", binding_inverted)], [
+                                                  _action("Double Click", "Show Overlay", "knob overlay", binding_inverted,
+                                                          legacy=inverted),
+                                                  _action("Enter Pressed", "Show Overlay", "knob overlay", binding_inverted,
+                                                          legacy=inverted)], [
                     _focus(cw, ch, bounds_version),
                     _sub("Knob", knob_data, _bounds((cw - sq) // 2, 0, sq, sq, version=bounds_version), "Slider"),
                     _name_label(0, name_y, cw, name_h, 17.0, INK, bounds_version=bounds_version,
                                 role="control_name"),
                     _value_label(0, value_y, cw, value_h, 22.0, INK_DIM, bounds_version=bounds_version,
-                                 handle=value_handle, role="control_value")],
+                                 role="control_value")],
                     version=2 if inverted else 4))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - sq // 2, cw, ch,
-                                    extra={"Value": i} if value_handle == "Value" else None,
-                                    invert=binding_inverted, bounds_version=bounds_version,
-                                    extra_invert=("Value",) if value_handle == "Value" else ()))
+                                    invert=binding_inverted, bounds_version=bounds_version))
             elif kind == "meter" and lk and lk.get("look") == "native":
                 # EXPERIMENTAL, unverified (docs/ROADMAP.md "A native Meter component"): a real Meter component
                 # instead of a Knob/FilmStrip pretending to be one. inactiveImage is the constant background;

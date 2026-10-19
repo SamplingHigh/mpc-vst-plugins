@@ -41,10 +41,12 @@ int main(void) {
     }
     CHECK(named == a->npar, "every param has a name (%d/%d)", named, a->npar);
 
-    int cont = -1, en = -1, pop = -1;
+    int cont = -1, integer = -1, en = -1, pop = -1;
     for (int i = 0; i < NPARAMS; i++) {
         const param_t *p = &PARAMS[i];
         if (cont < 0 && !p->nopts && !p->momentary && !p->string_display && p->step_target < 0 && p->max > p->min) cont = i;
+        if (p->int_display && !p->nopts && p->max > p->min &&
+            (integer < 0 || p->max - p->min < PARAMS[integer].max - PARAMS[integer].min)) integer = i;
         if (en < 0 && p->nopts > 2 && !p->momentary && p->popup_of < 0) en = i;
         if (pop < 0 && p->popup_of >= 0) pop = i;
     }
@@ -60,6 +62,17 @@ int main(void) {
         CHECK(!strcmp(d, PARAMS[en].opts[n - 1]), "option %s -> \"%s\" (want \"%s\")", PARAMS[en].key, d, PARAMS[en].opts[n - 1]);
         a->setP(a, en, (n - 1.5f) / (n - 1));   /* a Q-Link nudge down from the last option: one step */
         CHECK(fabsf(a->getP(a, en) - (float)(n - 2) / (n - 1)) < 1e-3f, "nudge steps one option (%.3f)", a->getP(a, en));
+    }
+    if (integer >= 0) {
+        float span = PARAMS[integer].max - PARAMS[integer].min;
+        a->setP(a, integer, 0.5f);
+        float before = a->getP(a, integer);
+        a->setP(a, integer, before + 0.01f / span);
+        float after = a->getP(a, integer);
+        a->d(a, 7, integer, 0, d, 0);
+        CHECK(fabsf(after - before - 1.0f / span) < 1e-3f,
+              "integer Q-Link nudge steps %s once (%.3f -> %.3f, display \"%s\")",
+              PARAMS[integer].key, before, after, d);
     }
     if (pop >= 0) {
         int t = PARAMS[pop].popup_of, n = PARAMS[t].nopts;
