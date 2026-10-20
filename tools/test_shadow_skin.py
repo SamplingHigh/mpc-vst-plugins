@@ -171,6 +171,15 @@ class BuildAttrs(unittest.TestCase):
         self.assertEqual(value["componentData"]["data"]["textStyle"]["font"]["height"], 40.0)
         self.assertEqual(int(value["bounds"]["bounds"].split()[2]), 90)
 
+    def test_knob_value_y_offset(self):
+        normal, _ = self.build("[tab T]\nknob cx=200 cy=300 r=30 key=a ns=30 vs=37\n")
+        raised, _ = self.build("[tab T]\nknob cx=200 cy=300 r=30 key=a ns=30 vs=37 vy=-14\n")
+        normal_value = [c for c in self.knob_def(normal)["componentsData"] if c["componentData"]["name"] == "Value"][0]
+        raised_value = [c for c in self.knob_def(raised)["componentsData"] if c["componentData"]["name"] == "Value"][0]
+        normal_y = int(normal_value["bounds"]["bounds"].split()[1])
+        raised_y = int(raised_value["bounds"]["bounds"].split()[1])
+        self.assertEqual(raised_y, normal_y - 14)
+
     def test_side_knob_puts_the_value_beside_the_picture(self):
         defs, _ = self.build("[tab T]\nknob cx=300 cy=300 r=20 key=a lay=side bw=240 bh=60 vs=40\n")
         kd = self.knob_def(defs, "shKnobSide")

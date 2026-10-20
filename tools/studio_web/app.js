@@ -27,7 +27,7 @@ const BOXED = ["frame", "list", "picture"];   // placed by their top-left corner
 const GEOM = {
   frame: [["x", "x", "n"], ["y", "y", "n"], ["w", "width", "n"], ["h", "height", "n"]],
   list: [["x", "x", "n"], ["y", "y", "n"], ["w", "width", "n"], ["h", "height", "n"], ["cols", "columns", "n"], ["rows", "rows", "n"], ["th", "row height", "n"], ["gap", "gap", "n"]],
-  knob: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["r", "radius", "n"]],
+  knob: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["r", "radius", "n"], ["vy", "value y offset", "on"]],
   toggle: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["w", "image width", "on"], ["h", "image height", "on"]],
   button: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["w", "image width", "on"], ["h", "image height", "on"]],
   picture: [["x", "x", "n"], ["y", "y", "n"], ["w", "width", "n"], ["h", "height", "n"]],
