@@ -196,6 +196,12 @@ class OsCompatTest(Base):
 
 
 class CatalogTest(Base):
+    def test_packaged_plugin_list_uses_lf_line_endings(self):
+        z = self.build()
+        with zipfile.ZipFile(z) as f:
+            name = [n for n in f.namelist() if n.endswith("/plugin_list.awk")][0]
+            self.assertNotIn(b"\r", f.read(name))
+
     def test_good_package(self):
         z = self.build()
         errors, warnings, rec = catalog_check.check(z, catalog=True, expect_id="test-synth", expect_repo="acme/test-synth")
