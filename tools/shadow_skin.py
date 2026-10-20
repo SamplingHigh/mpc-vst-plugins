@@ -68,7 +68,8 @@ Any widget line (frames and art too) can carry `banks="NAME|NAME"`: it is only o
 (the tab's `qlinks` titles), so a sub-page can show and touch-edit what its Q-Links edit; its baked parts become their
 own image on those sub-pages.
 Knobs and sliders take `ns=<px>` / `vs=<px>` (name / value text size; ns=0: no name) and `bw=<px>` (touch box and
-text width, e.g. narrower than the usual 130 px where neighbours sit close and their boxes would overlap). `knob ... lay=side [bw= bh= vs=]`: the
+text width, e.g. narrower than the usual 130 px where neighbours sit close and their boxes would overlap). Knobs also
+take `vy=<px>` to move only the live value vertically (negative is up). `knob ... lay=side [bw= bh= vs=]`: the
 knob's picture at the left of a bw x bh box (default 4 knobs wide), its value (vs= px, default 30) in the rest, no name.
 Toggles take
 `bw=` and `ns=0` too (other ns= sizes are not used on toggles); enum_v takes `sh=` like enum_h.
@@ -180,7 +181,7 @@ def parse_layout(path):
     return tabs, top
 
 
-INT_KEYS = ("x", "y", "w", "h", "cx", "cy", "r", "sw", "sh", "rows", "cols", "th", "gap", "cw", "ns", "vs", "bw", "bh")
+INT_KEYS = ("x", "y", "w", "h", "cx", "cy", "r", "sw", "sh", "rows", "cols", "th", "gap", "cw", "ns", "vs", "bw", "bh", "vy")
 
 
 def parse_widget(line):
@@ -674,8 +675,8 @@ def _value_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyC
 
 
 def text_sfx(w, cw):
-    """Definition-key suffix for a control's own ns=/vs=/bw= (controls that differ need their own definition)."""
-    return "".join("_%s%d" % (k, w[k]) for k in ("ns", "vs", "bw") if w.get(k) is not None)
+    """Definition-key suffix for a control's own text geometry (different geometry needs its own definition)."""
+    return "".join("_%s%d" % (k, w[k]) for k in ("ns", "vs", "bw", "vy") if w.get(k) is not None)
 
 
 def _name_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred"):
@@ -937,9 +938,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 if w.get("ns") is not None:
                     name_h = 0 if w["ns"] == 0 else max(name_h, round(w["ns"] * 1.2))
                 name_y = s // 2 + r + 2
-                value_y = name_y + name_h + (2 if name_h else 0)
+                value_y = name_y + name_h + (2 if name_h else 0) + w.get("vy", 0)
                 value_h = round(26 * LABEL_SCALE) if w.get("vs") is None else max(round(26 * LABEL_SCALE), round(w["vs"] * 1.2))
-                ch = value_y + value_h + 6
+                ch = max(s, value_y + value_h + 6)
                 radii.add((r, lid))
                 ink, dim = w.get("ink") or INK, w.get("ink_dim") or INK_DIM   # per-control label colours (ink=, ink_dim=)
                 key = "shKnob%d%s%s%s" % (r, sfx, ("_ls%g" % LABEL_SCALE) if LABEL_SCALE != 1.0 else "",
