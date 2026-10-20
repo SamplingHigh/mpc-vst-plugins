@@ -394,8 +394,12 @@ def check(zpath, catalog=False, expect_id=None, expect_repo=None, require_portab
             if text.encode() != files[script]:
                 warn("%s differs from this repo's current template (older release tool, or modified): review it" % script)
     canon = os.path.join(HERE, "release", "plugin_list.awk")
-    if os.path.exists(canon) and "plugin_list.awk" in files and open(canon, "rb").read() != files["plugin_list.awk"]:
-        warn("plugin_list.awk differs from this repo's current copy: review it")
+    if os.path.exists(canon) and "plugin_list.awk" in files:
+        with open(canon, "rb") as f:
+            canon_data = f.read().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        packaged_data = files["plugin_list.awk"].replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        if canon_data != packaged_data:
+            warn("plugin_list.awk differs from this repo's current copy: review it")
 
     # Which MPC OS generations it works on, from its library and its skin (docs/OS2_SKINS.md). Computed here, never taken on trust: a
     # manifest's os_compat may only narrow it (a developer holding a plugin back), and a claim of 2.x that the check cannot confirm is an error.

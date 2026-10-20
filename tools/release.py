@@ -85,7 +85,11 @@ for spec in a.extra:
     extras.append(dest)
 meta = re.sub(r'(\s)file="[^"]*"', lambda m: '%sfile="%%payload-path%%/%s/%s"' % (m.group(1), skin_name, so_name), entry, count=1)
 open(os.path.join(pdir, "plugin-meta.xml"), "w").write(meta + "\n")
-shutil.copy2(os.path.join(HERE, "release", "plugin_list.awk"), root)
+# BusyBox awk on the device rejects CRLF scripts. A Windows checkout may have
+# converted this helper even when release.py itself is run from WSL.
+awk = open(os.path.join(HERE, "release", "plugin_list.awk"), "rb").read()
+awk = awk.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+open(os.path.join(root, "plugin_list.awk"), "wb").write(awk)
 
 for d in a.user_data:
     if not re.fullmatch(r"[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*", d) or ".." in d.split("/"):
