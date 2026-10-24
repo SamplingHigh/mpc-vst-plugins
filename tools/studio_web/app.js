@@ -27,13 +27,13 @@ const BOXED = ["frame", "list", "picture"];   // placed by their top-left corner
 const GEOM = {
   frame: [["x", "x", "n"], ["y", "y", "n"], ["w", "width", "n"], ["h", "height", "n"]],
   list: [["x", "x", "n"], ["y", "y", "n"], ["w", "width", "n"], ["h", "height", "n"], ["cols", "columns", "n"], ["rows", "rows", "n"], ["th", "row height", "n"], ["gap", "gap", "n"]],
-  knob: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["r", "radius", "n"]],
+  knob: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["r", "radius", "n"], ["vy", "value y offset", "on"]],
   toggle: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["w", "image width", "on"], ["h", "image height", "on"]],
   button: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["w", "image width", "on"], ["h", "image height", "on"]],
   picture: [["x", "x", "n"], ["y", "y", "n"], ["w", "width", "n"], ["h", "height", "n"]],
-  enum_v: [["cx", "centre x", "n"], ["cy", "centre y", "n"]],
+  enum_v: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["label_gap", "label padding", "on"]],
   text: [["cx", "centre x", "n"], ["cy", "centre y", "n"]],
-  enum_h: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["sw", "segment width", "on"], ["rows", "rows", "on"]],
+  enum_h: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["sw", "segment width", "on"], ["rows", "rows", "on"], ["label_gap", "label padding", "on"]],
   popup: [["cx", "centre x", "n"], ["cy", "centre y", "n"], ["w", "width", "n"], ["h", "height", "n"], ["cols", "list columns", "on"]],
   art: [["x", "x", "on"], ["y", "y", "on"], ["w", "width", "on"], ["h", "height", "on"]],
 };
@@ -61,7 +61,7 @@ const TEXT = {
          ["opacity", "opacity (0-1)", "s"], ["italic", "italic", "sel:,1"]],
 };
 for (const k of ["knob", "slider_v", "slider_h", "toggle", "menu", "meter"]) TEXT[k] = [["label", "label", "s"], ["key", "parameter", "key"]];
-const LOOK_ATTRS = ["look", "img", "img_on", "base", "strip", "frames", "peak", "rms"];
+const LOOK_ATTRS = ["look", "img", "img_on", "base", "reveal", "strip", "frames", "peak", "rms"];
 
 // ---------------------------------------------------------------- state
 
@@ -942,7 +942,7 @@ function renderTheme() {
     const reset = el("button", { textContent: "reset", disabled: !v, onclick: () => edit(() => headSet("theme_" + k, undefined)) });
     p.append(el("div", { className: "ui-color" }, c, lab, reset));
   }
-  const lookRe = /^\s*(knob|slider|toggle|button|seg|frame|popup|meter)_(look|img|img_on|base|strip|frames)\s*=/;
+  const lookRe = /^\s*(knob|slider|toggle|button|seg|frame|popup|meter)_(look|img|img_on|base|reveal|strip|frames)\s*=/;
   const lookLines = S.doc.head.filter(l => lookRe.test(l));
   p.append(el("h3", {}, "Default looks"), el("p", { className: "ui-note" }, lookLines.length ? "Every control of that kind without its own look:" :
     "None: controls are drawn by the renderer. Set a control's look, then “Use for every …” in its inspector."));
@@ -1302,7 +1302,7 @@ function placeImage(n) {
 
 const LOOK_HELP = {
   knob: { img: "turning image (drawn pointing up = the middle of the travel)", base: "still base under it (optional: a scale, a skirt)" },
-  slider: { img: "thumb (as wide as a vertical slider, as tall as a horizontal one)", base: "track (optional; stretched to the slider)" },
+  slider: { img: "thumb (as wide as a vertical slider, as tall as a horizontal one)", base: "track (optional; stretched to the slider)", reveal: "marks revealed above a vertical slider's thumb (optional)" },
   toggle: { img: "off image", img_on: "on image (optional: the off image brightened)" },
   button: { img: "off image (the label is drawn on top)", img_on: "on image (optional)" },
   seg: { img: "off image (each option; its name on top)", img_on: "selected image (optional)" },
@@ -1370,12 +1370,17 @@ function renderLook(p, w, it) {
     p.append(field(help.img || "image", imagePicker(w.img, v => v && put("img", v), { none: null })));
     if (help.img_on) p.append(field(help.img_on, imagePicker(w.img_on, v => put("img_on", v))));
     if (help.base) p.append(field(help.base, imagePicker(w.base, v => put("base", v))));
+    if (help.reveal) p.append(field(help.reveal, imagePicker(w.reveal, v => put("reveal", v))));
   } else if (mode === "strip") {
     p.append(field("filmstrip", imagePicker(w.strip, v => v && put("strip", v), { none: null })));
     const aspect = g === "knob" ? 1 : (w.h || 1) / (w.w || 1), auto = stripFrames(w.strip, null, aspect);
     const fr = el("input", { type: "number", value: w.frames ?? "", placeholder: auto ? `auto: ${auto}` : "auto" });
     bindEdit(fr, x => { const ww = W(S.sel[0]); if (x.value === "") delete ww.frames; else ww.frames = Math.max(1, Math.round(+x.value)); });
     p.append(field("frames (when the shape doesn't say)", fr));
+  } else if (g === "slider" && mode !== "drawn") {
+    p.append(field(help.img, imagePicker(w.img, v => put("img", v))));
+    p.append(field(help.base, imagePicker(w.base, v => put("base", v))));
+    p.append(field(help.reveal, imagePicker(w.reveal, v => put("reveal", v))));
   } else if (g === "knob" && mode !== "drawn") {
     p.append(field(help.base, imagePicker(w.base, v => put("base", v))));
   }

@@ -443,6 +443,16 @@ class Art:
         return '<svg x="%g" y="%g" width="%g" height="%g" viewBox="%s" preserveAspectRatio="%s" overflow="hidden">%s</svg>' % (
             x, y, w, h, vb or "0 0 %d %d" % (iw, ih), par, inner)
 
+    def image_crop_top(self, path, x, y, w, h, crop_h):
+        """An image stretched to x/y/w/h, but visible only in its top crop_h pixels."""
+        crop_h = max(0, min(h, crop_h))
+        if crop_h <= 0:
+            return ""
+        inner = self.image(path, 0, 0, w, h, "stretch")
+        return ('<svg x="%g" y="%g" width="%g" height="%g" viewBox="0 0 %g %g" '
+                'preserveAspectRatio="none" overflow="hidden">%s</svg>') % (
+                    x, y, w, crop_h, w, crop_h, inner)
+
     def strip_frame(self, path, x, y, w, h, t, frames=None, aspect=1.0):
         """The frame of a filmstrip for value t (0..1), drawn into the box."""
         iw, ih, n, down = skin_assets.strip_layout(path, frames, aspect)
@@ -499,6 +509,8 @@ class Art:
             track = self.image(look["base"], x, y, w, h, "stretch")
         elif fader:
             track = fader_track(x, y, w, h, vert, th if vert else tw)
+        if vert and look.get("reveal"):
+            track += self.image_crop_top(look["reveal"], x, y, w, h, ty - y)
         if look.get("img"):
             thumb = self.image(look["img"], tx, ty, tw, th)
         elif fader:

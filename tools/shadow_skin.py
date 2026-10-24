@@ -23,8 +23,10 @@ Layout file:
                                                         get= draws that parameter's text in Titillium on the button.
                                                         A transparent hit plate sits on top of that caption so the
                                                         tap fires the trigger, not the text parameter.)
-    enum_h  cx= cy= label="..." key=<param> [options="A,B,.."] [sw=<px>] [rows=<n>]
-    enum_v  cx= cy= label="..." key=<param> [options="A,B,.."] [sw=<px>]   (options default to the param's)
+    enum_h  cx= cy= label="..." key=<param> [options="A,B,.."] [sw=<px>] [rows=<n>] [label_gap=<px>]
+    enum_v  cx= cy= label="..." key=<param> [options="A,B,.."] [sw=<px>] [label_gap=<px>]
+                                                        (label_gap is the clear space between the group label and
+                                                        the first selector segment; options default to the param's)
     slider_v cx= cy= w= h= label="..." key=<param>     (vertical slider; value text below)
     slider_h cx= cy= w= h= label="..." key=<param>     (horizontal slider; value text below)
     readout cx= cy= w= h= label="..." key=<param> [label_align=center]   (live value text;
@@ -68,7 +70,8 @@ Any widget line (frames and art too) can carry `banks="NAME|NAME"`: it is only o
 (the tab's `qlinks` titles), so a sub-page can show and touch-edit what its Q-Links edit; its baked parts become their
 own image on those sub-pages.
 Knobs and sliders take `ns=<px>` / `vs=<px>` (name / value text size; ns=0: no name; vs=0 on a knob: no value text) and `bw=<px>` (touch box and
-text width, e.g. narrower than the usual 130 px where neighbours sit close and their boxes would overlap). `knob ... lay=side [bw= bh= vs=]`: the
+text width, e.g. narrower than the usual 130 px where neighbours sit close and their boxes would overlap). Knobs also
+take `vy=<px>` to move only the live value vertically (negative is up). `knob ... lay=side [bw= bh= vs=]`: the
 knob's picture at the left of a bw x bh box (default 4 knobs wide), its value (vs= px, default 30) in the rest, no name.
 Toggles take
 `bw=` and `ns=0` too (other ns= sizes are not used on toggles); enum_v takes `sh=` like enum_h.
@@ -180,7 +183,7 @@ def parse_layout(path):
     return tabs, top
 
 
-INT_KEYS = ("x", "y", "w", "h", "cx", "cy", "r", "sw", "sh", "rows", "cols", "th", "gap", "cw", "ns", "vs", "bw", "bh")
+INT_KEYS = ("x", "y", "w", "h", "cx", "cy", "r", "sw", "sh", "rows", "cols", "th", "gap", "cw", "ns", "vs", "bw", "bh", "vy", "label_gap")
 
 
 def parse_widget(line):
@@ -298,6 +301,21 @@ def toggle_rect(w, base_dir="."):
     """A toggle's image box (shadow coords): the stock pill, or its look's size."""
     tw, th = skin_assets.toggle_size(w, look_of(w, base_dir))
     return (w["cx"] - tw // 2, w["cy"] - th // 2, tw, th)
+
+
+def toggle_name_geometry(w, base_dir="."):
+    """Static toggle-name geometry matching the native Name label's placement."""
+    lk = look_of(w, base_dir)
+    if lk:
+        _x, y, tw, th = toggle_rect(w, base_dir)
+        width = max(w.get("bw") or TOG_W(), tw + 10)
+        top = y + th + 4
+    else:
+        width = max(53, w.get("bw") or TOG_W())
+        top = w["cy"] - 18 + 34
+    height = NAME_H()
+    size = float(w.get("ns") or NAME_FONT("toggle"))
+    return w["cx"], top + height / 2, width, height, size
 
 
 def under():
@@ -496,6 +514,21 @@ def seg_rects(w):
     return out
 
 
+def selector_label_y(w, text_height):
+    """Return the label's vertical centre.
+
+    label_gap= uses an actual edge-to-edge gap, shared by horizontal and
+    vertical selectors.  Layouts without it retain the legacy placement.
+    """
+    if "label_gap" in w:
+        selector_top = min(y for _x, y, _width, _height in seg_rects(w))
+        return selector_top - w["label_gap"] - text_height / 2
+    if w["kind"] == "enum_h":
+        return w["cy"] - 33 // 2 - 22
+    n = len(w["options"])
+    return w["cy"] - (n * 32) // 2 - 24
+
+
 LABEL_SCALE = 1.15   # was 1.5: the baked bitmap font (font8x8.h) IS mixed-case (has a-z), but at
                       # 1.5x its fixed monospace cell (10px/char * scale) read as too wide/shouty
                       # when paired with Title Case text -- see docs/NOTES.md. Only affects control
@@ -519,10 +552,9 @@ def label_cmds(w, title_font=None):
         return []
     s = LABEL_SCALE
     if k == "enum_h":
-        return ["text|%d|%d|%s|%s|%s" % (w["cx"], w["cy"] - 33 // 2 - 22, s, INK, lab)]
+        return ["text|%d|%d|%s|%s|%s" % (w["cx"], round(selector_label_y(w, 8 * s)), s, INK, lab)]
     if k == "enum_v":
-        n = len(w["options"])
-        return ["text|%d|%d|%s|%s|%s" % (w["cx"], w["cy"] - (n * 32) // 2 - 24, s, ACCENT_HI, lab)]
+        return ["text|%d|%d|%s|%s|%s" % (w["cx"], round(selector_label_y(w, 8 * s)), s, ACCENT_HI, lab)]
     return []
 
 
@@ -573,6 +605,10 @@ def baked_cmds(w, title_font=None, base_dir="."):
         for (x, y, tw, th) in list_tiles(w):
             cmds.append(card_art(w["img"], x, y, tw, th, base_dir) if w.get("img")
                         else "tile|%d|%d|%d|%d|%s|%s|0" % (x, y, tw, th, w.get("color") or LCD, LINE))
+    elif w["kind"] == "toggle" and w.get("_static_name"):
+        cx, cy, _width, _height, size = toggle_name_geometry(w, base_dir)
+        cmds.append("htext|%d|%d|%s|%s|middle|600||||0||%s" %
+                    (cx, round(cy), size / 10, w.get("ink") or INK, w.get("label", "")))
     elif w["kind"] == "text":
         size = float(w.get("size", 1.5))
         color = w.get("color", INK)
@@ -611,7 +647,7 @@ def text_box(w):
     return (x0 - 4, w["cy"] - th // 2 - 4, lw + 8, th + 8)
 
 
-def baked_rect(w):
+def baked_rect(w, base_dir="."):
     """Area (shadow coords) that baked_cmds(w) draws into, generously; None if it draws nothing."""
     k = w["kind"]
     if k == "art":
@@ -629,6 +665,9 @@ def baked_rect(w):
         lw = text_width(w["label"], LABEL_SCALE)
         x0, x1 = min(x0, w["cx"] - lw // 2), max(x1, w["cx"] + lw // 2)
         return (x0 - 4, y0 - 48, x1 - x0 + 8, 48)
+    if k == "toggle" and w.get("_static_name"):
+        cx, cy, width, height, _size = toggle_name_geometry(w, base_dir)
+        return (round(cx - width / 2) - 4, round(cy - height / 2) - 4, width + 8, height + 8)
     if k == "text":
         return text_box(w)
     return None
@@ -674,8 +713,8 @@ def _value_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyC
 
 
 def text_sfx(w, cw):
-    """Definition-key suffix for a control's own ns=/vs=/bw= (controls that differ need their own definition)."""
-    return "".join("_%s%d" % (k, w[k]) for k in ("ns", "vs", "bw") if w.get(k) is not None)
+    """Definition-key suffix for a control's own text geometry (different geometry needs its own definition)."""
+    return "".join("_%s%d" % (k, w[k]) for k in ("ns", "vs", "bw", "vy") if w.get(k) is not None)
 
 
 def _name_label(x, y, w, h, size, colour, just="horizontallyCentred verticallyCentred"):
@@ -811,6 +850,12 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
             if w["kind"] == "meter":   # display only: no Q-Link
                 continue
             p = params[index[k]]
+            if (html and w["kind"] == "toggle" and w.get("ns") != 0 and w.get("label") and
+                    w.get("label") != p.get("name")):
+                # A native Label type=Name always shows the parameter's compiled name, ignoring
+                # the layout label. Bake the requested label into the page and suppress that
+                # native Name child so skin-only updates can really rename toggle captions.
+                w["_static_name"] = True
             if w["kind"] == "popup":
                 if k + OPEN_SUFFIX not in index:
                     raise SystemExit("layout: popup %r needs param %r (build through gen_vst.py)" % (k, k + OPEN_SUFFIX))
@@ -836,7 +881,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
         for w in tab["widgets"]:
             if banks_of(w) and not banks_of(w) <= titles_:
                 raise SystemExit("layout: banks=%s: not qlinks pages of tab %r (%s)" % (w["banks"], tab["name"], ",".join(sorted(titles_))))
-        base = [w for w in tab["widgets"] if not cond(w) and not (banks_of(w) and baked_rect(w))]
+        base = [w for w in tab["widgets"] if not cond(w) and not (banks_of(w) and baked_rect(w, base_dir))]
         script.append("clear|" + PLATE)
         for w in base:
             script += baked_cmds(w, TITLE_FONT, base_dir)
@@ -849,10 +894,10 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
         for w in tab["widgets"]:
             if cond(w):
                 modes.setdefault(cond(w), []).append(w)
-            elif banks_of(w) and baked_rect(w):   # baked parts on some sub-pages only: their own image, filtered below
+            elif banks_of(w) and baked_rect(w, base_dir):   # baked parts on some sub-pages only: their own image, filtered below
                 modes.setdefault(("banks", w["banks"]), []).append(w)
         for m_i, (hnd, ws) in enumerate(modes.items()):
-            rects = [baked_rect(w) for w in ws if baked_rect(w)]
+            rects = [baked_rect(w, base_dir) for w in ws if baked_rect(w, base_dir)]
             if not rects:
                 continue
             bx, by = max(0, min(r_[0] for r_ in rects)), max(Y_OFF, min(r_[1] for r_ in rects))
@@ -937,12 +982,12 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 if w.get("ns") is not None:
                     name_h = 0 if w["ns"] == 0 else max(name_h, round(w["ns"] * 1.2))
                 name_y = s // 2 + r + 2
-                value_y = name_y + name_h + (2 if name_h else 0)
+                value_y = name_y + name_h + (2 if name_h else 0) + w.get("vy", 0)
                 value_h = round(26 * LABEL_SCALE) if w.get("vs") is None else max(round(26 * LABEL_SCALE), round(w["vs"] * 1.2))
                 novalue = w.get("vs") == 0   # vs=0: no value text under the knob (the artwork has its own labels)
                 if novalue:
                     value_h = 0
-                ch = value_y + value_h + (0 if novalue else 6)
+                ch = max(s, value_y + value_h + (0 if novalue else 6))
                 radii.add((r, lid))
                 ink, dim = w.get("ink") or INK, w.get("ink_dim") or INK_DIM   # per-control label colours (ink=, ink_dim=)
                 key = "shKnob%d%s%s%s" % (r, sfx, ("_ls%g" % LABEL_SCALE) if LABEL_SCALE != 1.0 else "",
@@ -966,7 +1011,8 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
             elif kind == "toggle" and lk:
                 tw, th = skin_assets.toggle_size(w, lk)
                 nn = w.get("ns") == 0   # ns=0: no name label, the box is just the picture
-                key = "shToggle_%s_%dx%d" % (lid, tw, th) + text_sfx(w, 0)
+                static_name = bool(w.get("_static_name"))
+                key = "shToggle_%s_%dx%d" % (lid, tw, th) + text_sfx(w, 0) + ("_sn" if static_name else "")
                 cw, ch = (tw, th) if nn else (max(w.get("bw") or TOG_W(), tw + 10), th + 6 + NAME_H())
                 if key not in defs:
                     img = "sh_tog_%s_%dx%d" % (lid, tw, th)
@@ -975,20 +1021,22 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                                    "crop|%s|200|300|%d|%d" % (art("%s_%s" % (img, "on" if on else "off")), tw, th)]
                     defs[key] = _local(key, [_action("Mouse Down", "Q-Link"), _action("Enter Pressed", "Toggle Switch")],
                                        [_focus(cw, ch), _button(img + "_on.png", img + "_off.png", 1, 1, tw, th, (cw - tw) // 2, 0)] +
-                                       ([] if nn else [_name_label(0, th + 4, cw, NAME_H(), NAME_FONT("toggle"), INK)]))
+                                       ([] if nn or static_name else [_name_label(0, th + 4, cw, NAME_H(), NAME_FONT("toggle"), INK)]))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - th // 2, cw, ch))
             elif kind == "toggle":
                 cw = max(53, w.get("bw") or TOG_W())   # bw=: a narrower touch box (and name) for close neighbours
                 nn = w.get("ns") == 0   # ns=0: the pill alone, no name
+                static_name = bool(w.get("_static_name"))
                 cw, th_ = (53, 37) if nn else (cw, 38 + NAME_H())
-                key = "shToggle" + (("_ls%g" % LABEL_SCALE) if SCALE_NAMES and LABEL_SCALE != 1.0 else "") + text_sfx(w, 0)
+                key = ("shToggle" + (("_ls%g" % LABEL_SCALE) if SCALE_NAMES and LABEL_SCALE != 1.0 else "") +
+                       text_sfx(w, 0) + ("_sn" if static_name else ""))
                 if key not in defs:
                     for on in (0, 1):
                         script += ["clear|" + under(), "pill|100|100|%d" % on,
                                    "crop|%s|74|86|53|29" % art("sh_pill_%s" % ("on" if on else "off"))]
                     defs[key] = _local(key, [_action("Mouse Down", "Q-Link"), _action("Enter Pressed", "Toggle Switch")],
                                        [_focus(cw, th_), _button("sh_pill_on.png", "sh_pill_off.png", 1, 1, 53, 29, (cw - 53) // 2, 4)] +
-                                       ([] if nn else [_name_label(0, 34, cw, NAME_H(), NAME_FONT("toggle"), INK)]))
+                                       ([] if nn or static_name else [_name_label(0, 34, cw, NAME_H(), NAME_FONT("toggle"), INK)]))
                 kids.append(_placed(key, name, i, w["cx"] - cw // 2, w["cy"] - 18, cw, th_))
             elif kind == "button":
                 x, y, bw, bh = button_rect(w, base_dir)
@@ -1359,12 +1407,12 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
         group_font = ImageFont.truetype(TITLE_FONT, 18) if TITLE_FONT else None
         for w in groups:   # enum_h/enum_v's own group label -- see label_cmds()'s title_font branch
             if w["kind"] == "enum_h":
-                gx, gy, color = w["cx"], w["cy"] - 33 // 2 - 22, INK
+                gx, color = w["cx"], INK
             else:
-                n = len(w["options"])
-                gx, gy, color = w["cx"], w["cy"] - (n * 32) // 2 - 24, ACCENT_HI
+                gx, color = w["cx"], ACCENT_HI
             tb = dr.textbbox((0, 0), w["label"], font=group_font)
             tw, th = tb[2] - tb[0], tb[3] - tb[1]
+            gy = selector_label_y(w, th)
             dr.text((gx - ox - tw / 2 - tb[0], gy - oy - th / 2 - tb[1]), w["label"], font=group_font, fill="#" + color)
         for w in [q for q in pops if q.get("accent") != "none" and q.get("field") != "none"]:   # the field's "opens a list" marker (accent=none: invisible field)
             x, y = w["cx"] + w["w"] // 2 - 22 - ox, w["cy"] - oy

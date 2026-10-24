@@ -3,7 +3,7 @@
 A control's look comes from its layout line, else from a top-level default for its group:
 
     knob     look=moog | img=knob.png [base=scale.png] | strip=knobs.png [frames=N]
-    slider_v / slider_h   look=fader | img=cap.png [base=track.png] | strip=fader.png [frames=N]
+    slider_v / slider_h   look=fader | img=cap.png [base=track.png] [reveal=marks.png] | strip=fader.png [frames=N]
     toggle   look=led | img=off.png [img_on=on.png] [w= h=]
     button   img=pad.png [img_on=pad_lit.png] [w= h=]          (the label is drawn on top; label="" for none)
     enum_h / enum_v   img=seg.png [img_on=seg_lit.png]         (each option: the image, its name on top)
@@ -22,7 +22,9 @@ A control's look comes from its layout line, else from a top-level default for i
 
 img is the moving part: a knob image turns through the knob's 270 degrees (drawn pointing up = the middle of the
 travel), a slider image is the thumb (as wide as a vertical slider, as tall as a horizontal one). base stays still
-under it (a knob's scale or skirt; a slider's track, stretched to the slider). strip is a ready filmstrip, frames
+under it (a knob's scale or skirt; a slider's track, stretched to the slider). A vertical slider's optional reveal
+image is drawn over the base only above the moving thumb, useful for marks that should appear as a control is pulled
+down. strip is a ready filmstrip, frames
 stacked down (or across, for a wide image), minimum at the top/left; the frame count comes from the image shape
 unless frames= says. On/off images: img is off, img_on is on (without it, img brightened). peak/rms are a native
 meter's own overlay images (see above). Paths are relative to the layout. Images: .png .jpg .jpeg .webp .gif .svg.
@@ -37,8 +39,8 @@ import struct
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
         ".svg": "image/svg+xml"}
-ATTRS = ("look", "img", "img_on", "base", "strip", "frames", "peak", "rms")
-FILE_ATTRS = ("img", "img_on", "base", "strip", "peak", "rms")
+ATTRS = ("look", "img", "img_on", "base", "reveal", "strip", "frames", "peak", "rms")
+FILE_ATTRS = ("img", "img_on", "base", "reveal", "strip", "peak", "rms")
 GROUP = {"knob": "knob", "slider_v": "slider", "slider_h": "slider", "toggle": "toggle", "button": "button",
          "enum_h": "seg", "enum_v": "seg", "frame": "frame", "popup": "popup", "meter": "meter"}
 LOOKS = {"knob": ("moog", "chicken", "metal", "cap", "prophet", "hardware", "chrome", "bakelite", "davies", "rubber", "ledring", "taper"), "slider": ("fader",), "toggle": ("led", "switch"),

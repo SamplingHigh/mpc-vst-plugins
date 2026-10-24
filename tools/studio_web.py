@@ -205,11 +205,22 @@ def widget_svg(w, art, params, base_dir):
             art.run(c)
     if k == "knob":
         r = w["r"]
-        s, cw = 2 * r + 10, max(130, 2 * r + 10)
+        s, cw = 2 * r + 10, max(round(130 * ss.LABEL_SCALE) if ss.SCALE_NAMES else 130, 2 * r + 10)
+        if w.get("bw"):
+            cw = max(s, w["bw"])
         x0, y0 = w["cx"] - cw // 2, w["cy"] - s // 2
+        nfont = ss.NAME_FONT("knob") if w.get("ns") is None else float(w["ns"])
+        vfont = 22.0 * ss.LABEL_SCALE if w.get("vs") is None else float(w["vs"])
+        name_h = ss.NAME_H() if ss.SCALE_NAMES else round(20 * ss.LABEL_SCALE)
+        if w.get("ns") is not None:
+            name_h = 0 if w["ns"] == 0 else max(name_h, round(w["ns"] * 1.2))
+        name_y = y0 + s // 2 + r + 2
+        value_y = name_y + name_h + (2 if name_h else 0) + w.get("vy", 0)
+        value_h = round(26 * ss.LABEL_SCALE) if w.get("vs") is None else max(round(26 * ss.LABEL_SCALE), round(w["vs"] * 1.2))
         art.ops.append(art.knob_frame(w["cx"], w["cy"], r, 40, lk))
-        live += [live_text(x0, y0 + s // 2 + r + 2, cw, 20, name, 17, w.get("ink") or ss.INK),
-                 live_text(x0, y0 + s // 2 + r + 24, cw, 26, "40", 22, w.get("ink_dim") or ss.INK_DIM)]
+        if name_h:
+            live.append(live_text(x0, name_y, cw, name_h, name, nfont, w.get("ink") or ss.INK))
+        live.append(live_text(x0, value_y, cw, value_h, "40", vfont, w.get("ink_dim") or ss.INK_DIM))
     elif k == "meter" and lk and lk.get("look") == "native":
         # EXPERIMENTAL (docs/ROADMAP.md): static preview only -- the background image, then the peak image at a
         # fixed proportion (like studio.py preview, not a simulation of MPC's own unverified reveal logic)
@@ -241,10 +252,12 @@ def widget_svg(w, art, params, base_dir):
     elif k == "toggle" and lk:
         x, y, tw, th = ss.toggle_rect(w, base_dir)
         art.ops.append(art.toggle_frame(x + tw / 2, y + th / 2, 0, tw, th, lk))
-        live.append(live_text(w["cx"] - 60, y + th + 4, 120, 20, name, 15, ss.INK))
+        if w.get("ns") != 0:
+            live.append(live_text(w["cx"] - 60, y + th + 4, 120, 20, name, w.get("ns") or 15, ss.INK))
     elif k == "toggle":
         art.run("pill|%d|%d|0" % (w["cx"], w["cy"]))
-        live.append(live_text(w["cx"] - 60, w["cy"] - 18 + 34, 120, 20, name, 15, ss.INK))
+        if w.get("ns") != 0:
+            live.append(live_text(w["cx"] - 60, w["cy"] - 18 + 34, 120, 20, name, w.get("ns") or 15, ss.INK))
     elif k == "button" and lk:
         x, y, bw, bh = ss.button_rect(w, base_dir)
         art.ops.append(art.button_frame(x, y, bw, bh, 0, w.get("label", ""), lk))
@@ -614,7 +627,8 @@ def serve(layout=None, params_path=None, host="127.0.0.1", port=8765, open_brows
     if srv is None:
         raise SystemExit("studio: no free port")
     srv.RequestHandlerClass = handler(st, host, lambda: threading.Thread(target=srv.shutdown, daemon=True).start())
-    url = "http://%s:%d/" % ("localhost" if host in ("127.0.0.1", "::1") else host, srv.server_address[1])
+    url_host = "[%s]" % host if ":" in host else host
+    url = "http://%s:%d/" % (url_host, srv.server_address[1])
     print("Skin Studio: %s" % url)
     print("  %s" % ("editing " + st.layout if st.layout else "open a layout in the browser"))
     print("  Keep this window open while you edit. To stop: Quit in the page, Ctrl+C, or close the window.")
